@@ -121,7 +121,7 @@ export function DecisionPanel({
         ))}
         <div className="mt-5 flex flex-wrap gap-3">
           <button
-            className={`rounded-full px-5 py-2 text-sm font-medium text-white shadow-soft transition-colors ${
+            className={`rounded-xl px-5 py-2 text-sm font-medium text-white shadow-soft transition-colors ${
               canSubmit ? "bg-accent hover:bg-accent-hover" : "bg-ink-400/40 cursor-not-allowed"
             }`}
             onClick={() => {
@@ -133,7 +133,7 @@ export function DecisionPanel({
             Submit answers
           </button>
           <button
-            className="rounded-full border border-ink-900/10 bg-surface px-5 py-2 text-sm font-medium text-ink-700 hover:bg-surface-tertiary transition-colors"
+            className="rounded-xl border border-ink-900/10 bg-surface px-5 py-2 text-sm font-medium text-ink-700 hover:bg-surface-tertiary transition-colors"
             onClick={() => onSubmit({ behavior: "deny", message: "User canceled the question" })}
           >
             Cancel
@@ -156,13 +156,13 @@ export function DecisionPanel({
       </div>
       <div className="mt-4 flex flex-wrap gap-3">
         <button
-          className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-white shadow-soft hover:bg-accent-hover transition-colors"
+          className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-white shadow-soft hover:bg-accent-hover transition-colors"
           onClick={() => onSubmit({ behavior: "allow", updatedInput: request.input as Record<string, unknown> })}
         >
           Allow
         </button>
         <button
-          className="rounded-full border border-ink-900/10 bg-surface px-5 py-2 text-sm font-medium text-ink-700 hover:bg-surface-tertiary transition-colors"
+          className="rounded-xl border border-ink-900/10 bg-surface px-5 py-2 text-sm font-medium text-ink-700 hover:bg-surface-tertiary transition-colors"
           onClick={() => onSubmit({ behavior: "deny", message: "User denied the request" })}
         >
           Deny

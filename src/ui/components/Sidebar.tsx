@@ -322,7 +322,7 @@ export function Sidebar({
                       <span className="whitespace-nowrap">{formatRelativeTime(session.updatedAt)}</span>
                     )}
                     <span className="text-[10px] uppercase tracking-wider whitespace-nowrap">
-                      {session.status}
+                      {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
                     </span>
                   </div>
                 </div>

@@ -43,7 +43,7 @@ export function TurnBlock({
   }, [turn.userInput.prompt]);
 
   return (
-    <div className="py-1" data-turn-index={turn.turnIndex}>
+    <div className="py-3" data-turn-index={turn.turnIndex}>
       {/* User message */}
       {isReEditing ? (
         <div className="mb-3 ml-auto max-w-[85%]">

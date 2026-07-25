@@ -92,7 +92,7 @@ export function UserBubble({
       <div className="flex items-start gap-3 flex-row-reverse">
         <div className="w-full min-w-0 flex flex-col items-end">
           {/* Bubble */}
-          <div className="w-fit max-w-[80%] rounded-2xl px-4 py-2.5 bg-surface text-foreground shadow-subtle">
+          <div className="w-fit max-w-[85%] lg:max-w-[700px] rounded-2xl px-5 py-3 bg-surface text-foreground shadow-subtle">
             <MDContent text={prompt} />
           </div>
 

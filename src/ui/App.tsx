@@ -397,7 +397,7 @@ function App() {
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="relative flex-1 overflow-y-auto px-8 pb-40 pt-6"
+            className="relative flex-1 overflow-y-auto px-6 pb-40 pt-6"
           >
             {/* Gradient fade at top when scrolled up */}
             {hasMoreHistory && scrollY > 50 && (
@@ -409,18 +409,10 @@ function App() {
 
               {!hasMoreHistory && totalMessages > 0 && (
                 <div className="flex items-center justify-center py-4 mb-4">
-                  <div className="flex items-center gap-2 text-xs text-muted">
-                    <div className="h-px w-16 bg-gradient-to-r from-transparent to-ink-900/10" />
-                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-muted-light" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M12 8v4l3 3" strokeLinecap="round" />
-                      <circle cx="12" cy="12" r="10" />
-                    </svg>
-                    <span>Beginning of conversation</span>
-                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-muted-light" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M12 8v4l3 3" strokeLinecap="round" />
-                      <circle cx="12" cy="12" r="10" />
-                    </svg>
-                    <div className="h-px w-16 bg-gradient-to-l from-transparent to-ink-900/10" />
+                  <div className="flex items-center gap-2 text-xs text-muted-light">
+                    <div className="h-px w-12 bg-gradient-to-r from-transparent to-ink-900/10" />
+                    Beginning of conversation
+                    <div className="h-px w-12 bg-gradient-to-l from-transparent to-ink-900/10" />
                   </div>
                 </div>
               )}
@@ -463,7 +455,7 @@ function App() {
         {hasNewMessages && !shouldAutoScroll && (
           <button
             onClick={scrollToBottom}
-            className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-white/20 bg-accent/95 backdrop-blur-sm px-4 py-2 text-sm font-medium text-white shadow-elevated transition-all hover:bg-accent hover:scale-105 animate-slide-up-fade"
+            className="fixed bottom-24 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-white/20 bg-accent/95 backdrop-blur-sm px-4 py-2 text-sm font-medium text-white shadow-elevated transition-all hover:bg-accent hover:scale-105 animate-slide-up-fade"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 5v14M5 12l7 7 7-7" />

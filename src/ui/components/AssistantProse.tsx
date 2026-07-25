@@ -148,7 +148,7 @@ export function AssistantProse({
     .join("\n\n");
 
   return (
-    <div className="group mr-auto max-w-[85%]">
+    <div className="group mr-auto max-w-[85%] lg:max-w-[75%] xl:max-w-[700px]">
       {/* Render each content block as a collapsible section */}
       {blocks.map((block, idx) => {
         switch (block.type) {

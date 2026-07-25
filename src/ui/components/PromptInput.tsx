@@ -129,7 +129,7 @@ export function PromptInput({ sendEvent, onSendMessage, disabled = false }: Prom
               <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              <span className="text-[11px] font-mono text-muted truncate">{cwd.split('/').filter(Boolean).slice(-2).join('/')}</span>
+              <span className="text-xs font-mono text-muted truncate">{cwd.split('/').filter(Boolean).slice(-2).join('/')}</span>
             </div>
           )}
           <textarea

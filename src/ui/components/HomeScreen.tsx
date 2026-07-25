@@ -64,7 +64,7 @@ export function HomeScreen() {
           className="mt-2 text-muted animate-fade-in-scale"
           style={{ animationDelay: "120ms", animationFillMode: "both" }}
         >
-          What would you like agent cowork to handle?
+          What would you like Agent Cowork to handle?
         </p>
       </div>
     </>

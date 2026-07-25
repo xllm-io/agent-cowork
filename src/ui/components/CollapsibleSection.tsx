@@ -36,11 +36,11 @@ export function CollapsibleSection({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
-    <div className="my-1.5 rounded-xl border border-ink-900/5 bg-surface-secondary overflow-hidden transition-colors hover:border-ink-900/10">
+    <div className="my-2 rounded-xl border border-ink-900/5 bg-surface-secondary overflow-hidden transition-colors hover:border-ink-900/10">
       {/* Header row — always visible */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-muted hover:text-ink-600 transition-colors"
+        className="flex w-full items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-muted hover:text-ink-600 transition-colors"
       >
         {/* Status dot */}
         <span className={`relative flex h-2 w-2 shrink-0 ${STATUS_COLORS[status] || STATUS_COLORS.success}`}>
@@ -50,7 +50,7 @@ export function CollapsibleSection({
         </span>
 
         {/* Icon */}
-        {icon && <span className="h-3.5 w-3.5 shrink-0 text-muted">{icon}</span>}
+        {icon && <span className="h-4 w-4 shrink-0 text-muted">{icon}</span>}
 
         {/* Title */}
         <span className="min-w-0 truncate text-left">{title}</span>
@@ -76,7 +76,7 @@ export function CollapsibleSection({
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="border-t border-ink-900/5 px-3 pb-3 pt-2">
+        <div className="border-t border-ink-900/5 px-3.5 pb-3 pt-3">
           {maxLines > 0 && typeof children === "string" ? (
             <div className="text-sm text-ink-700 whitespace-pre-wrap leading-relaxed overflow-hidden" style={{
               maxHeight: maxLines * 1.5 + "rem",
