@@ -1,10 +1,10 @@
 
 <div align="center">
 
-# Open Claude Cowork
+# Agent Cowork
 
-[![Version](https://img.shields.io/badge/version-0.0.2-blue.svg)](https://github.com/DevAgentForge/Claude-Cowork/releases)
-[![Platform](https://img.shields.io/badge/platform-%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/DevAgentForge/Claude-Cowork/releases)
+[![Version](https://img.shields.io/badge/version-0.0.2-blue.svg)](https://github.com/xllm-io/agent-cowork/releases)
+[![Platform](https://img.shields.io/badge/platform-%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/xllm-io/agent-coworks/releases)
 
 [简体中文](README_ZH.md)
 
@@ -52,7 +52,7 @@ That means:
 
 ### Option 1: Download a Release
 
-👉 [Go to Releases](https://github.com/DevAgentForge/agent-cowork/releases)
+👉 [Go to Releases](https://github.com/xllm-io/agent-cowork/releases)
 
 
 ### Option 2: Build from Source
@@ -64,7 +64,7 @@ That means:
 
 bash
 #### Clone the repository
-git clone https://github.com/DevAgentForge/agent-cowork.git
+git clone https://github.com/xllm-io/agent-cowork.git
 cd agent-cowork
 
 #### Install dependencies
@@ -82,12 +82,6 @@ bun run dist:win          # Windows
 bun run dist:linux        # Linux
 ```
 
-## Example
-An example of organizing a local folder:
-
-https://github.com/user-attachments/assets/8ce58c8b-4024-4c01-82ee-f8d8ed6d4bba
-
-
 ## 🛠 Development
 
 bash
@@ -96,7 +90,6 @@ bun run dev
 
 #### Type checking / build
 bun run build
-
 
 
 ## 🗺 Roadmap
