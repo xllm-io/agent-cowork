@@ -34,7 +34,11 @@ electron.contextBridge.exposeInMainWorld("electron", {
     saveApiConfig: (config: any) => 
         ipcInvoke("save-api-config", config),
     checkApiConfig: () =>
-        ipcInvoke("check-api-config")
+        ipcInvoke("check-api-config"),
+    createTempDirectory: () =>
+        ipcInvoke("create-temp-directory"),
+    listDirectories: (parentPath?: string) =>
+        ipcInvoke("list-directories", parentPath)
 } satisfies Window['electron'])
 
 function ipcInvoke<Key extends keyof EventPayloadMapping>(key: Key, ...args: any[]): Promise<EventPayloadMapping[Key]> {

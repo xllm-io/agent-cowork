@@ -72,6 +72,7 @@ export function usePromptActions(sendEvent: (event: ClientEvent) => void) {
 export function PromptInput({ sendEvent, onSendMessage, disabled = false }: PromptInputProps) {
   const { prompt, setPrompt, isRunning, handleSend, handleStop } = usePromptActions(sendEvent);
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
+  const cwd = useAppStore((state) => state.cwd);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (disabled && !isRunning) return;
@@ -121,19 +122,34 @@ export function PromptInput({ sendEvent, onSendMessage, disabled = false }: Prom
   return (
     <section className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-surface via-surface to-transparent pb-6 px-2 lg:pb-8 pt-8 lg:ml-[280px]">
       <div className="mx-auto flex w-full max-w-full items-end gap-3 rounded-2xl border border-ink-900/10 bg-surface px-4 py-3 shadow-card lg:max-w-3xl">
-        <textarea
-          rows={1}
-          className="flex-1 resize-none bg-transparent py-1.5 text-sm text-ink-800 placeholder:text-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-          placeholder={disabled ? "Create/select a task to start..." : "Describe what you want agent to handle..."}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onInput={handleInput}
-          ref={promptRef}
-          disabled={disabled && !isRunning}
-        />
+        <div className="flex-1 flex flex-col gap-2">
+          {/* Folder path badge */}
+          {cwd && (
+            <div className="flex items-center gap-1.5 px-0.5">
+              <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              <span className="text-[11px] font-mono text-muted truncate">{cwd.split('/').filter(Boolean).slice(-2).join('/')}</span>
+            </div>
+          )}
+          <textarea
+            rows={1}
+            style={{ transition: 'height 0.15s ease-out' }}
+            className="flex-1 resize-none bg-transparent py-1.5 text-sm text-ink-800 placeholder:text-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            placeholder={disabled ? "Create/select a task to start..." : "Describe what you want agent to handle..."}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onInput={handleInput}
+            ref={promptRef}
+            disabled={disabled && !isRunning}
+          />
+        </div>
         <button
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${isRunning ? "bg-error text-white hover:bg-error/90" : "bg-accent text-white hover:bg-accent-hover"}`}
+          className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${isRunning
+              ? "bg-error text-white hover:bg-error/90 hover:scale-95"
+              : "bg-accent text-white hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/20 hover:scale-105"
+            }`}
           onClick={handleButtonClick}
           aria-label={isRunning ? "Stop session" : "Send prompt"}
           disabled={disabled && !isRunning}

@@ -1,100 +1,90 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIPC } from "./hooks/useIPC";
 import { useMessageWindow } from "./hooks/useMessageWindow";
 import { useAppStore } from "./store/useAppStore";
+import { groupIntoTurns } from "./hooks/useTurns";
 import type { ServerEvent } from "./types";
 import { Sidebar } from "./components/Sidebar";
-import { StartSessionModal } from "./components/StartSessionModal";
 import { SettingsModal } from "./components/SettingsModal";
-import { PromptInput, usePromptActions } from "./components/PromptInput";
-import { MessageCard } from "./components/EventCard";
-import MDContent from "./render/markdown";
+import { HomeScreen } from "./components/HomeScreen";
+import { DirectoryPickerPopover } from "./components/DirectoryPickerPopover";
+import { PromptInput } from "./components/PromptInput";
+import { TurnBlock } from "./components/TurnBlock";
 
 const SCROLL_THRESHOLD = 50;
 
+// ---------------------------------------------------------------------------
+// Main App
+// ---------------------------------------------------------------------------
+
 function App() {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const topSentinelRef = useRef<HTMLDivElement>(null);
-  const partialMessageRef = useRef("");
-  const [partialMessage, setPartialMessage] = useState("");
-  const [showPartialMessage, setShowPartialMessage] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const topSentinelRef = useRef<HTMLDivElement | null>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
   const prevMessagesLengthRef = useRef(0);
   const scrollHeightBeforeLoadRef = useRef(0);
   const shouldRestoreScrollRef = useRef(false);
 
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
-  const showStartModal = useAppStore((s) => s.showStartModal);
-  const setShowStartModal = useAppStore((s) => s.setShowStartModal);
   const showSettingsModal = useAppStore((s) => s.showSettingsModal);
   const setShowSettingsModal = useAppStore((s) => s.setShowSettingsModal);
   const globalError = useAppStore((s) => s.globalError);
   const setGlobalError = useAppStore((s) => s.setGlobalError);
   const historyRequested = useAppStore((s) => s.historyRequested);
   const markHistoryRequested = useAppStore((s) => s.markHistoryRequested);
-  const resolvePermissionRequest = useAppStore((s) => s.resolvePermissionRequest);
   const handleServerEvent = useAppStore((s) => s.handleServerEvent);
   const prompt = useAppStore((s) => s.prompt);
-  const setPrompt = useAppStore((s) => s.setPrompt);
   const cwd = useAppStore((s) => s.cwd);
-  const setCwd = useAppStore((s) => s.setCwd);
   const pendingStart = useAppStore((s) => s.pendingStart);
-  const apiConfigChecked = useAppStore((s) => s.apiConfigChecked);
-  const setApiConfigChecked = useAppStore((s) => s.setApiConfigChecked);
 
-  // Helper function to extract partial message content
-  const getPartialMessageContent = (eventMessage: any) => {
-    try {
-      const realType = eventMessage.delta.type.split("_")[0];
-      return eventMessage.delta[realType];
-    } catch (error) {
-      console.error(error);
-      return "";
-    }
-  };
+  // Inline new-session form state (LobsterAI CoworkView pattern)
+  const [formCwd, setFormCwd] = useState(cwd);
+  const [formPrompt, setFormPrompt] = useState(prompt);
+  const [formModel, setFormModel] = useState("");
+  const [showDirPicker, setShowDirPicker] = useState(false);
+  const dirPickerRef = useRef<HTMLDivElement>(null);
 
-  // Handle partial messages from stream events
-  const handlePartialMessages = useCallback((partialEvent: ServerEvent) => {
-    if (partialEvent.type !== "stream.message" || partialEvent.payload.message.type !== "stream_event") return;
-
-    const message = partialEvent.payload.message as any;
-    if (message.event.type === "content_block_start") {
-      partialMessageRef.current = "";
-      setPartialMessage(partialMessageRef.current);
-      setShowPartialMessage(true);
-    }
-
-    if (message.event.type === "content_block_delta") {
-      partialMessageRef.current += getPartialMessageContent(message.event) || "";
-      setPartialMessage(partialMessageRef.current);
-      if (shouldAutoScroll) {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      } else {
-        setHasNewMessages(true);
+  // Auto-close directory picker on outside click / escape
+  useEffect(() => {
+    if (!showDirPicker) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dirPickerRef.current && !dirPickerRef.current.contains(e.target as Node)) {
+        setShowDirPicker(false);
       }
-    }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowDirPicker(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showDirPicker]);
 
-    if (message.event.type === "content_block_stop") {
-      setShowPartialMessage(false);
-      setTimeout(() => {
-        partialMessageRef.current = "";
-        setPartialMessage(partialMessageRef.current);
-      }, 500);
-    }
-  }, [shouldAutoScroll]);
+  // Load API config model + recent cwds on mount
+  useEffect(() => {
+    window.electron.getApiConfig().then((config) => {
+      if (config?.model) setFormModel(config.model);
+    }).catch(() => {});
+  }, []);
 
-  // Combined event handler
+  // Sync local state with store when it changes
+  useEffect(() => { setFormCwd(cwd); }, [cwd]);
+  useEffect(() => { setFormPrompt(prompt); }, [prompt]);
+
+  // Combined event handler — only handleServerEvent needed now;
+  // partial blocks are assembled in the store and rendered via turns.
   const onEvent = useCallback((event: ServerEvent) => {
     handleServerEvent(event);
-    handlePartialMessages(event);
-  }, [handleServerEvent, handlePartialMessages]);
+  }, [handleServerEvent]);
 
   const { connected, sendEvent } = useIPC(onEvent);
-  const { handleStartFromModal } = usePromptActions(sendEvent);
 
   const activeSession = activeSessionId ? sessions[activeSessionId] : undefined;
   const messages = activeSession?.messages ?? [];
@@ -110,20 +100,11 @@ function App() {
     totalMessages,
   } = useMessageWindow(messages, permissionRequests, activeSessionId);
 
-  // 启动时检查 API 配置
-  useEffect(() => {
-    if (!apiConfigChecked) {
-      window.electron.checkApiConfig().then((result) => {
-        setApiConfigChecked(true);
-        if (!result.hasConfig) {
-          setShowSettingsModal(true);
-        }
-      }).catch((err) => {
-        console.error("Failed to check API config:", err);
-        setApiConfigChecked(true);
-      });
-    }
-  }, [apiConfigChecked, setApiConfigChecked, setShowSettingsModal]);
+  // Group visible messages into conversation turns (turn-based layout)
+  // Partial blocks are now assembled per-turn in groupIntoTurns.
+  const visibleTurns = useMemo(() => {
+    return groupIntoTurns(visibleMessages);
+  }, [visibleMessages]);
 
   useEffect(() => {
     if (connected) sendEvent({ type: "session.list" });
@@ -132,7 +113,7 @@ function App() {
   useEffect(() => {
     if (!activeSessionId || !connected) return;
     const session = sessions[activeSessionId];
-    if (session && !session.hydrated && !historyRequested.has(activeSessionId)) {
+    if (session && !session.hydrated && !historyRequested.includes(activeSessionId)) {
       markHistoryRequested(activeSessionId);
       sendEvent({ type: "session.history", payload: { sessionId: activeSessionId } });
     }
@@ -143,6 +124,7 @@ function App() {
     if (!container) return;
 
     const { scrollTop, scrollHeight, clientHeight } = container;
+    setScrollY(scrollTop);
     const isAtBottom = scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD;
 
     if (isAtBottom !== shouldAutoScroll) {
@@ -212,7 +194,7 @@ function App() {
       setHasNewMessages(true);
     }
     prevMessagesLengthRef.current = messages.length;
-  }, [messages, partialMessage, shouldAutoScroll]);
+  }, [messages, shouldAutoScroll]);
 
   const scrollToBottom = useCallback(() => {
     setShouldAutoScroll(true);
@@ -223,24 +205,65 @@ function App() {
 
   const handleNewSession = useCallback(() => {
     useAppStore.getState().setActiveSessionId(null);
-    setShowStartModal(true);
-  }, [setShowStartModal]);
+  }, []);
 
   const handleDeleteSession = useCallback((sessionId: string) => {
     sendEvent({ type: "session.delete", payload: { sessionId } });
   }, [sendEvent]);
-
-  const handlePermissionResult = useCallback((toolUseId: string, result: PermissionResult) => {
-    if (!activeSessionId) return;
-    sendEvent({ type: "permission.response", payload: { sessionId: activeSessionId, toolUseId, result } });
-    resolvePermissionRequest(activeSessionId, toolUseId);
-  }, [activeSessionId, sendEvent, resolvePermissionRequest]);
 
   const handleSendMessage = useCallback(() => {
     setShouldAutoScroll(true);
     setHasNewMessages(false);
     resetToLatest();
   }, [resetToLatest]);
+
+  // Show input when there's an active session with messages
+  const canUserInteract = activeSessionId && visibleMessages.length > 0;
+
+  // Start a new session from the inline form (LobsterAI CoworkView pattern)
+  const handleCreateSession = useCallback(async () => {
+    if (!formCwd.trim()) {
+      setGlobalError("Working Directory is required to start a session.");
+      return;
+    }
+    if (!formPrompt.trim()) {
+      setGlobalError("Prompt is required to start a session.");
+      return;
+    }
+
+    let title = "";
+    try {
+      setGlobalError(null);
+      useAppStore.getState().setPendingStart(true);
+      title = await window.electron.generateSessionTitle(formPrompt.trim());
+    } catch (error) {
+      console.error(error);
+      useAppStore.getState().setPendingStart(false);
+      setGlobalError("Failed to get session title.");
+      return;
+    }
+
+    sendEvent({
+      type: "session.start",
+      payload: {
+        title,
+        prompt: formPrompt.trim(),
+        cwd: formCwd || undefined,
+        allowedTools: "Read,Edit,Bash",
+      }
+    });
+
+    // Clear form state
+    setFormPrompt("");
+  }, [formCwd, formPrompt, sendEvent, setGlobalError]);
+
+  // Quick templates for the home screen
+  const QUICK_TEMPLATES = [
+    { label: "Explain code", prompt: "Please explain the code in this project and its architecture." },
+    { label: "Write tests", prompt: "Write comprehensive tests for the main functionality in this project." },
+    { label: "Debug issue", prompt: "Help me debug an issue. I'll describe the problem." },
+    { label: "Refactor", prompt: "Help me refactor this codebase for better readability and performance." },
+  ];
 
   return (
     <div className="flex h-screen bg-surface">
@@ -258,88 +281,189 @@ function App() {
           <span className="text-sm font-medium text-ink-700">{activeSession?.title || "Agent Cowork"}</span>
         </div>
 
-        <div
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-8 pb-40 pt-6"
-        >
-          <div className="mx-auto max-w-3xl">
-            <div ref={topSentinelRef} className="h-1" />
+        {/* No active session — show home screen (LobsterAI CoworkView pattern) */}
+        {!activeSessionId ? (
+          <div className="relative flex-1 overflow-y-auto min-h-0">
+            <div className="relative flex min-h-full w-full min-w-[320px] flex-col items-center px-4 py-8">
+              {/* Flexible spacers (2:3 ratio, optical centering) */}
+              <div aria-hidden className="w-full min-h-[56px] flex-[2_0_0px]" />
 
-            {!hasMoreHistory && totalMessages > 0 && (
-              <div className="flex items-center justify-center py-4 mb-4">
-                <div className="flex items-center gap-2 text-xs text-muted">
-                  <div className="h-px w-12 bg-ink-900/10" />
-                  <span>Beginning of conversation</span>
-                  <div className="h-px w-12 bg-ink-900/10" />
+              {/* Welcome Section — staggered entrance animation */}
+              <div className="w-full max-w-3xl text-center">
+                <HomeScreen />
+              </div>
+
+              {/* Large Prompt Input Area — LobsterAI CoworkPromptInput size="large" pattern */}
+              <div className="relative z-30 mt-9 w-full max-w-3xl animate-fade-in-up" style={{ animationDelay: "180ms", animationFillMode: "both" }}>
+                <div className="rounded-2xl border border-border bg-surface shadow-card focus-within:border-accent/30 focus-within:shadow-elevated transition-all duration-200">
+                  <textarea
+                    rows={2}
+                    className="w-full resize-none bg-transparent px-4 pb-2 pt-3 text-sm leading-relaxed text-ink-800 placeholder:text-muted focus:outline-none min-h-[52px] max-h-[200px]"
+                    placeholder="Describe what you want agent to handle..."
+                    value={formPrompt}
+                    onChange={(e) => setFormPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleCreateSession();
+                      }
+                    }}
+                  />
+                  <div className="relative flex items-center justify-between gap-3 px-4 pb-2 pt-1">
+                    <div className="flex shrink-0 items-center gap-3">
+                      {/* Folder selector */}
+                      <div ref={dirPickerRef} className="relative min-w-0 shrink">
+                        <button
+                          type="button"
+                          onClick={() => setShowDirPicker(!showDirPicker)}
+                          className={`flex h-7 items-center gap-1.5 rounded-lg px-2 text-[13px] transition-colors ${
+                            formCwd ? "text-secondary hover:bg-background/80 hover:text-foreground" : "text-muted"
+                          }`}
+                          title={formCwd || "Select a working directory"}
+                        >
+                          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8">
+                            <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                          </svg>
+                          <span className="min-w-0 truncate max-w-[200px]">
+                            {formCwd ? formCwd.split('/').filter(Boolean).slice(-2).join('/') : "Select folder"}
+                          </span>
+                        </button>
+                        {showDirPicker && (
+                          <DirectoryPickerPopover
+                            value={formCwd}
+                            onChange={(path) => { setFormCwd(path); setShowDirPicker(false); }}
+                            onClose={() => setShowDirPicker(false)}
+                          />
+                        )}
+                      </div>
+
+                      {/* Model selector */}
+                      <div className="relative min-w-0 shrink">
+                        <input
+                          type="text"
+                          className="flex h-7 items-center rounded-lg border border-ink-900/10 bg-surface px-2 text-[13px] text-ink-700 hover:border-ink-900/20 focus:border-accent focus:outline-none transition-colors max-w-[180px]"
+                          placeholder="Model (optional)"
+                          value={formModel}
+                          onChange={(e) => setFormModel(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Send button */}
+                    <button
+                      onClick={handleCreateSession}
+                      disabled={!formPrompt.trim()}
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${
+                        formPrompt.trim()
+                          ? "bg-accent text-white hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/20 hover:scale-105"
+                          : "bg-surface-tertiary text-muted"
+                      }`}
+                      title="Send"
+                    >
+                      {pendingStart ? (
+                        <svg aria-hidden="true" className="w-5 h-5 animate-spin" viewBox="0 0 100 101" fill="none">
+                          <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor" opacity="0.3" />
+                          <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="white" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4l2.8 7.2L16 12l-9.8 1.4-2.8 7.2Z" fill="currentColor" /></svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {isLoadingHistory && (
-              <div className="flex items-center justify-center py-4 mb-4">
-                <div className="flex items-center gap-2 text-xs text-muted">
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>Loading...</span>
-                </div>
+              {/* Quick Action Chips — LobsterAI QuickActionBar pattern */}
+              <div className="relative z-0 mt-8 flex w-full max-w-3xl flex-wrap justify-center gap-2 animate-fade-in-up" style={{ animationDelay: "260ms", animationFillMode: "both" }}>
+                {QUICK_TEMPLATES.map((action) => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={() => {
+                      setFormPrompt(action.prompt);
+                    }}
+                    className="flex items-center gap-1.5 rounded-full border border-ink-900/10 bg-surface px-3.5 py-1.5 text-sm text-ink-700 transition-all duration-200 ease-out hover:-translate-y-px hover:border-accent/30 hover:bg-surface-raised hover:text-ink-800 hover:shadow-subtle active:translate-y-0 active:scale-[0.97]"
+                  >
+                    <span>{action.label}</span>
+                  </button>
+                ))}
               </div>
+
+              <div aria-hidden className="w-full min-h-[24px] flex-[3_0_0px]" />
+            </div>
+          </div>
+        ) : (
+          /* Active session content */
+          <div
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="relative flex-1 overflow-y-auto px-8 pb-40 pt-6"
+          >
+            {/* Gradient fade at top when scrolled up */}
+            {hasMoreHistory && scrollY > 50 && (
+              <div className="pointer-events-none absolute top-0 left-0 right-0 z-10 h-20 bg-gradient-to-b from-surface-cream to-transparent transition-opacity duration-200" />
             )}
 
-            {visibleMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="text-lg font-medium text-ink-700">No messages yet</div>
-                <p className="mt-2 text-sm text-muted">Start a conversation with agent cowork</p>
-              </div>
-            ) : (
-              visibleMessages.map((item, idx) => (
-                <MessageCard
-                  key={`${activeSessionId}-msg-${item.originalIndex}`}
-                  message={item.message}
-                  isLast={idx === visibleMessages.length - 1}
-                  isRunning={isRunning}
-                  permissionRequest={permissionRequests[0]}
-                  onPermissionResult={handlePermissionResult}
-                />
-              ))
-            )}
+            <div className="mx-auto max-w-3xl">
+              <div ref={topSentinelRef} className="h-1" />
 
-            {/* Partial message display with skeleton loading */}
-            <div className="partial-message">
-              <MDContent text={partialMessage} />
-              {showPartialMessage && (
-                <div className="mt-3 flex flex-col gap-2 px-1">
-                  <div className="relative h-3 w-2/12 overflow-hidden rounded-full bg-ink-900/10">
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-ink-900/30 to-transparent animate-shimmer" />
-                  </div>
-                  <div className="relative h-3 w-full overflow-hidden rounded-full bg-ink-900/10">
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-ink-900/30 to-transparent animate-shimmer" />
-                  </div>
-                  <div className="relative h-3 w-full overflow-hidden rounded-full bg-ink-900/10">
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-ink-900/30 to-transparent animate-shimmer" />
-                  </div>
-                  <div className="relative h-3 w-full overflow-hidden rounded-full bg-ink-900/10">
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-ink-900/30 to-transparent animate-shimmer" />
-                  </div>
-                  <div className="relative h-3 w-4/12 overflow-hidden rounded-full bg-ink-900/10">
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-ink-900/30 to-transparent animate-shimmer" />
+              {!hasMoreHistory && totalMessages > 0 && (
+                <div className="flex items-center justify-center py-4 mb-4">
+                  <div className="flex items-center gap-2 text-xs text-muted">
+                    <div className="h-px w-16 bg-gradient-to-r from-transparent to-ink-900/10" />
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-muted-light" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M12 8v4l3 3" strokeLinecap="round" />
+                      <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    <span>Beginning of conversation</span>
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-muted-light" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M12 8v4l3 3" strokeLinecap="round" />
+                      <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    <div className="h-px w-16 bg-gradient-to-l from-transparent to-ink-900/10" />
                   </div>
                 </div>
               )}
+
+              {isLoadingHistory && (
+                <div className="flex items-center justify-center py-4 mb-4">
+                  <div className="flex items-center gap-2 text-xs text-muted">
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Loading...</span>
+                  </div>
+                </div>
+              )}
+
+              {visibleTurns.length === 0 ? (
+                <HomeScreen />
+              ) : (
+                visibleTurns.map((turn, turnIdx) => (
+                  <TurnBlock
+                    key={`${activeSessionId}-turn-${turn.turnIndex}`}
+                    turn={turn}
+                    isLastTurn={turnIdx === visibleTurns.length - 1}
+                    isSessionRunning={isRunning}
+                  />
+                ))
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
-
-            <div ref={messagesEndRef} />
           </div>
-        </div>
+        )}
 
-        <PromptInput sendEvent={sendEvent} onSendMessage={handleSendMessage} disabled={visibleMessages.length === 0} />
+        {/* Prompt input — only shown when there's an active session */}
+        {activeSessionId && (
+          <PromptInput sendEvent={sendEvent} onSendMessage={handleSendMessage} disabled={!canUserInteract} />
+        )}
 
         {hasNewMessages && !shouldAutoScroll && (
           <button
             onClick={scrollToBottom}
-            className="fixed bottom-28 left-1/2 ml-[140px] z-40 -translate-x-1/2 flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white shadow-lg transition-all hover:bg-accent-hover hover:scale-105 animate-bounce-subtle"
+            className="fixed bottom-28 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-white/20 bg-accent/95 backdrop-blur-sm px-4 py-2 text-sm font-medium text-white shadow-elevated transition-all hover:bg-accent hover:scale-105 animate-slide-up-fade"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 5v14M5 12l7 7 7-7" />
@@ -348,18 +472,6 @@ function App() {
           </button>
         )}
       </main>
-
-      {showStartModal && (
-        <StartSessionModal
-          cwd={cwd}
-          prompt={prompt}
-          pendingStart={pendingStart}
-          onCwdChange={setCwd}
-          onPromptChange={setPrompt}
-          onStart={handleStartFromModal}
-          onClose={() => setShowStartModal(false)}
-        />
-      )}
 
       {showSettingsModal && (
         <SettingsModal onClose={() => setShowSettingsModal(false)} />

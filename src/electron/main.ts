@@ -8,6 +8,10 @@ import { generateSessionTitle } from "./libs/util.js";
 import { saveApiConfig } from "./libs/config-store.js";
 import { getCurrentApiConfig } from "./libs/claude-settings.js";
 import type { ClientEvent } from "./types.js";
+import { mkdtemp } from "fs/promises";
+import { tmpdir } from "os";
+import { join, basename } from "path";
+import { readdirSync, statSync } from "fs";
 import "./libs/claude-settings.js";
 
 let cleanupComplete = false;
@@ -133,6 +137,36 @@ app.on("ready", () => {
                 success: false, 
                 error: error instanceof Error ? error.message : String(error) 
             };
+        }
+    });
+
+    // Create a temporary random directory
+    ipcMainHandle("create-temp-directory", async () => {
+        try {
+            const tempDir = await mkdtemp(join(tmpdir(), "cowork-"));
+            return tempDir;
+        } catch (error) {
+            console.error("[main] Failed to create temp directory:", error);
+            return null;
+        }
+    });
+
+    // List subdirectories of a given path (for directory picker)
+    ipcMainHandle("list-directories", async (_: any, parentPath: string | null) => {
+        try {
+            const searchRoot = parentPath || process.env.HOME || process.env.USERPROFILE || "/Users";
+            const entries = readdirSync(searchRoot, { withFileTypes: true });
+            const dirs = entries
+                .filter((e) => e.isDirectory())
+                .map((e) => ({
+                    name: e.name,
+                    path: join(searchRoot, e.name),
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+            return { root: searchRoot, directories: dirs };
+        } catch (error) {
+            console.error("[main] Failed to list directories:", error);
+            return { root: "", directories: [] as Array<{ name: string; path: string }> };
         }
     });
 })

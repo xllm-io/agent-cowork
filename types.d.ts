@@ -21,6 +21,8 @@ type EventPayloadMapping = {
     "get-api-config": { apiKey: string; baseURL: string; model: string; apiType?: "anthropic" } | null;
     "save-api-config": { success: boolean; error?: string };
     "check-api-config": { hasConfig: boolean; config: { apiKey: string; baseURL: string; model: string; apiType?: "anthropic" } | null };
+    "create-temp-directory": string | null;
+    "list-directories": { root: string; directories: Array<{ name: string; path: string }> };
 }
 
 interface Window {
@@ -36,5 +38,7 @@ interface Window {
         getApiConfig: () => Promise<{ apiKey: string; baseURL: string; model: string; apiType?: "anthropic" } | null>;
         saveApiConfig: (config: { apiKey: string; baseURL: string; model: string; apiType?: "anthropic" }) => Promise<{ success: boolean; error?: string }>;
         checkApiConfig: () => Promise<{ hasConfig: boolean; config: { apiKey: string; baseURL: string; model: string; apiType?: "anthropic" } | null }>;
+        createTempDirectory: () => Promise<string | null>;
+        listDirectories: (parentPath?: string) => Promise<{ root: string; directories: Array<{ name: string; path: string }> }>;
     }
 }

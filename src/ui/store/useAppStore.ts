@@ -7,6 +7,21 @@ export type PermissionRequest = {
   input: unknown;
 };
 
+export type ToolStatusEntry = {
+  toolUseId: string;
+  status: "pending" | "success" | "error";
+};
+
+/** Partial content block being streamed for a session */
+export type PartialContentBlock = {
+  type: "thinking" | "text" | "tool_use";
+  id?: string;
+  name?: string;
+  content: string;       // accumulated text output
+  input: Record<string, unknown>; // accumulated tool input
+  isComplete: boolean;   // true once content_block_stop arrives
+};
+
 export type SessionView = {
   id: string;
   title: string;
@@ -14,10 +29,14 @@ export type SessionView = {
   cwd?: string;
   messages: StreamMessage[];
   permissionRequests: PermissionRequest[];
+  toolStatuses: ToolStatusEntry[];
   lastPrompt?: string;
   createdAt?: number;
   updatedAt?: number;
   hydrated: boolean;
+  pinned: boolean;
+  /** Live partial content blocks assembled from stream_event deltas */
+  partialBlocks: PartialContentBlock[];
 };
 
 interface AppState {
@@ -28,16 +47,14 @@ interface AppState {
   pendingStart: boolean;
   globalError: string | null;
   sessionsLoaded: boolean;
-  showStartModal: boolean;
   showSettingsModal: boolean;
-  historyRequested: Set<string>;
+  historyRequested: string[];
   apiConfigChecked: boolean;
 
   setPrompt: (prompt: string) => void;
   setCwd: (cwd: string) => void;
   setPendingStart: (pending: boolean) => void;
   setGlobalError: (error: string | null) => void;
-  setShowStartModal: (show: boolean) => void;
   setShowSettingsModal: (show: boolean) => void;
   setActiveSessionId: (id: string | null) => void;
   setApiConfigChecked: (checked: boolean) => void;
@@ -46,8 +63,79 @@ interface AppState {
   handleServerEvent: (event: ServerEvent) => void;
 }
 
+/**
+ * Assemble partial content blocks from stream_event deltas.
+ * This is called on every stream.message event during streaming to build
+ * up thinking/text/tool_use blocks in real-time before they arrive as
+ * fully-assembled SDKAssistantMessage objects.
+ */
+function assemblePartialBlock(
+  blocks: PartialContentBlock[],
+  msg: any, // SDKPartialAssistantMessage
+): PartialContentBlock[] {
+  const evt = msg.event;
+  if (!evt) return blocks;
+
+  // Handle content_block_start — initialize a new block
+  if (evt.type === "content_block_start") {
+    const cb = evt.content_block;
+    if (!cb || !cb.type) return blocks;
+    const type = cb.type as "thinking" | "text" | "tool_use";
+    const newBlock: PartialContentBlock = {
+      type,
+      content: "",
+      input: {},
+      isComplete: false,
+    };
+    if (type === "tool_use" && cb.id) newBlock.id = cb.id;
+    if (type === "tool_use" && cb.name) newBlock.name = cb.name;
+    return [...blocks, newBlock];
+  }
+
+  // Handle content_block_stop — mark block as complete
+  if (evt.type === "content_block_stop") {
+    return blocks.map((b) => (b.isComplete ? b : { ...b, isComplete: true }));
+  }
+
+  // Handle content_block_delta — accumulate content
+  if (evt.type !== "content_block_delta") return blocks;
+
+  const delta = evt.delta;
+  if (!delta) return blocks;
+
+  const blockType = delta.type; // "text" | "input_json" | "thinking"
+  if (!blockType) return blocks;
+
+  // Find or create the block being streamed
+  let idx = blocks.findIndex((b) => b.type === blockType && !b.isComplete);
+  if (idx === -1) {
+    const newBlock: PartialContentBlock = {
+      type: blockType as "thinking" | "text" | "tool_use",
+      content: "",
+      input: {},
+      isComplete: false,
+    };
+    idx = blocks.length;
+    blocks = [...blocks, newBlock];
+  }
+
+  const updated = [...blocks];
+  const block = updated[idx];
+
+  if (blockType === "input_json" && delta.partial_json) {
+    // Accumulate JSON string for tool inputs
+    block.input = { ...block.input, _partial: (block.input._partial || "") + delta.partial_json };
+  } else {
+    // Accumulate text/thinking content
+    const raw = (delta as any)[blockType] ?? "";
+    block.content += raw;
+  }
+
+  return updated;
+}
+
 function createSession(id: string): SessionView {
-  return { id, title: "", status: "idle", messages: [], permissionRequests: [], hydrated: false };
+  return { id, title: "", status: "idle", messages: [], permissionRequests: [], toolStatuses: [], hydrated: false, pinned: false, partialBlocks: [] };
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -58,26 +146,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingStart: false,
   globalError: null,
   sessionsLoaded: false,
-  showStartModal: false,
   showSettingsModal: false,
-  historyRequested: new Set(),
+  historyRequested: [],
   apiConfigChecked: false,
 
   setPrompt: (prompt) => set({ prompt }),
   setCwd: (cwd) => set({ cwd }),
   setPendingStart: (pendingStart) => set({ pendingStart }),
   setGlobalError: (globalError) => set({ globalError }),
-  setShowStartModal: (showStartModal) => set({ showStartModal }),
   setShowSettingsModal: (showSettingsModal) => set({ showSettingsModal }),
   setActiveSessionId: (id) => set({ activeSessionId: id }),
   setApiConfigChecked: (apiConfigChecked) => set({ apiConfigChecked }),
 
   markHistoryRequested: (sessionId) => {
-    set((state) => {
-      const next = new Set(state.historyRequested);
-      next.add(sessionId);
-      return { historyRequested: next };
-    });
+    set((state) => ({
+      historyRequested: [...state.historyRequested, sessionId],
+    }));
   },
 
   resolvePermissionRequest: (sessionId, toolUseId) => {
@@ -97,10 +181,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   handleServerEvent: (event) => {
-    const state = get();
-
     switch (event.type) {
       case "session.list": {
+        const state = get();
         const nextSessions: Record<string, SessionView> = {};
         for (const session of event.payload.sessions) {
           const existing = state.sessions[session.id] ?? createSession(session.id);
@@ -117,7 +200,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ sessions: nextSessions, sessionsLoaded: true });
 
         const hasSessions = event.payload.sessions.length > 0;
-        set({ showStartModal: !hasSessions });
 
         if (!hasSessions) {
           get().setActiveSessionId(null);
@@ -151,7 +233,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...existing, status, messages, hydrated: true }
+              [sessionId]: { ...existing, status, messages, hydrated: true, partialBlocks: [] }
             }
           };
         });
@@ -159,54 +241,56 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       case "session.status": {
-        const { sessionId, status, title, cwd } = event.payload;
         set((state) => {
-          const existing = state.sessions[sessionId] ?? createSession(sessionId);
+          const existing = state.sessions[event.payload.sessionId] ?? createSession(event.payload.sessionId);
+          const updated: SessionView = {
+            ...existing,
+            status: event.payload.status,
+            title: event.payload.title ?? existing.title,
+            cwd: event.payload.cwd ?? existing.cwd,
+            updatedAt: Date.now(),
+            // Clear partial blocks when session transitions away from running
+            partialBlocks: event.payload.status !== "running" ? [] : existing.partialBlocks,
+          };
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: {
-                ...existing,
-                status,
-                title: title ?? existing.title,
-                cwd: cwd ?? existing.cwd,
-                updatedAt: Date.now()
-              }
+              [event.payload.sessionId]: updated
             }
           };
         });
 
-        if (state.pendingStart) {
-          get().setActiveSessionId(sessionId);
-          set({ pendingStart: false, showStartModal: false });
+        // Check pendingStart after the set settles
+        const currentState = get();
+        if (currentState.pendingStart) {
+          get().setActiveSessionId(currentState.activeSessionId);
+          set({ pendingStart: false });
         }
         break;
       }
 
       case "session.deleted": {
         const { sessionId } = event.payload;
-        const state = get();
+        set((state) => {
+          const nextSessions = { ...state.sessions };
+          delete nextSessions[sessionId];
 
-        const nextSessions = { ...state.sessions };
-        delete nextSessions[sessionId];
+          const nextHistoryRequested = state.historyRequested.filter(id => id !== sessionId);
 
-        const nextHistoryRequested = new Set(state.historyRequested);
-        nextHistoryRequested.delete(sessionId);
+          const newState: Record<string, unknown> = {
+            sessions: nextSessions,
+            historyRequested: nextHistoryRequested,
+          };
 
-        const hasRemaining = Object.keys(nextSessions).length > 0;
+          if (state.activeSessionId === sessionId) {
+            const remaining = Object.values(nextSessions).sort(
+              (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)
+            );
+            newState.activeSessionId = remaining[0]?.id ?? null;
+          }
 
-        set({
-          sessions: nextSessions,
-          historyRequested: nextHistoryRequested,
-          showStartModal: !hasRemaining
+          return newState;
         });
-
-        if (state.activeSessionId === sessionId) {
-          const remaining = Object.values(nextSessions).sort(
-            (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)
-          );
-          get().setActiveSessionId(remaining[0]?.id ?? null);
-        }
         break;
       }
 
@@ -214,11 +298,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         const { sessionId, message } = event.payload;
         set((state) => {
           const existing = state.sessions[sessionId] ?? createSession(sessionId);
+
+          // Assemble partial content blocks from stream_event deltas
+          let nextPartialBlocks = [...existing.partialBlocks];
+          if (message.type === "stream_event") {
+            nextPartialBlocks = assemblePartialBlock(nextPartialBlocks, message);
+          }
+
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...existing, messages: [...existing.messages, message] }
-            }
+              [sessionId]: {
+                ...existing,
+                messages: [...existing.messages, message],
+                partialBlocks: nextPartialBlocks,
+              },
+            },
           };
         });
         break;
@@ -233,7 +328,9 @@ export const useAppStore = create<AppState>((set, get) => ({
               ...state.sessions,
               [sessionId]: {
                 ...existing,
-                messages: [...existing.messages, { type: "user_prompt", prompt }]
+                messages: [...existing.messages, { type: "user_prompt", prompt }],
+                // Clear partial blocks — new user input starts a fresh turn
+                partialBlocks: [],
               }
             }
           };

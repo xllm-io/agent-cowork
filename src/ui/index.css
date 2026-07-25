@@ -111,3 +111,36 @@ code, pre, textarea.mono, input.mono {
 .animate-shimmer {
   animation: shimmer 1.4s linear infinite;
 }
+
+/* ---------------------------------------------------------------------------
+ * Message entrance animations (inspired by LobsterAI CoworkView)
+ * --------------------------------------------------------------------------- */
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-scale {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes slide-up-fade {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.animate-fade-in-up    { animation: fade-in-up 0.3s ease-out both; }
+.animate-fade-in-scale { animation: fade-in-scale 0.4s ease-out both; }
+.animate-slide-up-fade { animation: slide-up-fade 0.25s ease-out both; }
+
+/* Typing indicator — subtle bounce for streaming assistant */
+@keyframes bounce-subtle {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 1.2s infinite ease-in-out;
+}
