@@ -18,6 +18,50 @@ type MenuItem = {
   onClick: () => void;
 };
 
+// ---------------------------------------------------------------------------
+// Session icon by status
+// ---------------------------------------------------------------------------
+
+const SessionIcon = ({ status }: { status: string }) => {
+  if (status === "running") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-info" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 6v6l4 2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (status === "error") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-error" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M15 9l-6 6M9 9l6 6" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  // completed / idle
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-muted-light" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="10" />
+    </svg>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Truncated title — keeps the end of long titles
+// ---------------------------------------------------------------------------
+
+function TruncatedTitle({ title, maxLength = 24 }: { title: string; maxLength?: number }) {
+  if (title.length <= maxLength) return <span>{title}</span>;
+  return (
+    <>
+      <span className="text-muted-light">…</span>
+      <span>{title.slice(-maxLength + 1)}</span>
+    </>
+  );
+}
+
 export function Sidebar({
   onNewSession,
   onDeleteSession
@@ -132,7 +176,6 @@ export function Sidebar({
         </svg>
       ),
       onClick: () => {
-        // Toggle pin via store update
         useAppStore.setState((state) => ({
           sessions: {
             ...state.sessions,
@@ -153,7 +196,6 @@ export function Sidebar({
         </svg>
       ),
       onClick: () => {
-        // Trigger export (placeholder — will be wired up in Phase 4.2)
         console.log("Export session:", session.id);
         setMenuPosition(null);
       },
@@ -222,19 +264,21 @@ export function Sidebar({
       return;
     }
     setMenuSessionId(session.id);
-    // Position menu near the button
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setMenuPosition({ right: Math.max(8, window.innerWidth - rect.right), y: rect.bottom + 8 });
     setDeleteConfirmId(null);
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 flex h-full w-[280px] flex-col gap-4 border-r border-ink-900/5 bg-[#FAF9F6] px-4 pb-4 pt-12">
+    <aside className="fixed inset-y-0 left-0 flex h-full w-[280px] flex-col border-r border-ink-900/5 bg-surface-cream">
+      {/* Title bar (draggable region for Electron) */}
       <div
         className="absolute top-0 left-0 right-0 h-12"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       />
-      <div className="flex gap-2">
+
+      {/* Top controls */}
+      <div className="relative flex items-center gap-2 px-4 pt-16 pb-2">
         <button
           className="flex-1 rounded-xl border border-ink-900/10 bg-surface px-4 py-2.5 text-sm font-medium text-ink-700 hover:bg-surface-tertiary hover:border-ink-900/20 transition-colors"
           onClick={onNewSession}
@@ -242,38 +286,45 @@ export function Sidebar({
           + New Task
         </button>
         <button
-          className="rounded-xl border border-ink-900/10 bg-surface px-4 py-3 text-sm text-ink-700 hover:bg-surface-tertiary hover:border-ink-900/20 transition-colors"
+          className="rounded-xl border border-ink-900/10 bg-surface px-3 py-2.5 text-ink-700 hover:bg-surface-tertiary hover:border-ink-900/20 transition-colors"
           onClick={() => useAppStore.getState().setShowSettingsModal(true)}
           aria-label="Settings"
         >
-          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
             <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06-.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
         </button>
       </div>
-      <div className="relative flex flex-col gap-2 overflow-y-auto flex-1">
+
+      {/* Session list */}
+      <div className="relative flex flex-1 flex-col overflow-y-auto px-3 py-2">
         {/* Top gradient fade indicator */}
-        <div className="pointer-events-none absolute top-0 left-4 right-4 z-10 h-6 bg-gradient-to-b from-[#FAF9F6] to-transparent" />
+        <div className="pointer-events-none absolute top-0 left-3 right-3 z-10 h-6 bg-gradient-to-b from-surface-cream to-transparent" />
 
         {sessionList.length === 0 && (
-          <div className="rounded-xl border border-ink-900/5 bg-surface px-4 py-5 text-center text-xs text-muted">
-            No sessions yet. Click "+ New Task" to start.
+          <div className="mx-auto mt-8 max-w-[200px] rounded-xl border border-dashed border-ink-900/10 px-4 py-6 text-center">
+            <svg viewBox="0 0 24 24" className="mx-auto h-8 w-8 text-muted-light/50" fill="none" stroke="currentColor" strokeWidth="1.2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <p className="mt-2 text-xs text-muted">No tasks yet</p>
+            <p className="mt-0.5 text-[11px] text-muted-light">Click "+ New Task" to start</p>
           </div>
         )}
+
         {sessionList.map((session) => {
           const isActive = activeSessionId === session.id;
           const isRenaming = renamingId === session.id;
           const showStatusDot = session.status === "running";
-          const showRelativeTime = !showStatusDot;
 
           return (
             <div
               key={session.id}
-              className={`group relative rounded-lg p-3 cursor-pointer transition-all duration-150 ${
+              className={`group relative my-0.5 rounded-xl p-3 cursor-pointer transition-all duration-150 ${
                 isActive
-                  ? "bg-black/[0.06]"
-                  : "hover:bg-black/[0.04]"
+                  ? "bg-accent-subtle shadow-subtle"
+                  : "hover:bg-surface-tertiary"
               }`}
               onClick={() => {
                 if (isRenaming) return;
@@ -289,13 +340,20 @@ export function Sidebar({
               role="button"
               tabIndex={0}
             >
-              <div className="flex items-start">
-                <div className="flex-1 min-w-0">
-                  {/* Title row with status dot */}
-                  <div className="flex items-center mb-1 gap-2">
-                    {showStatusDot && (
-                      <span className="block w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 shadow-[0_0_6px_rgba(59,130,246,0.5)] animate-pulse" />
-                    )}
+              <div className="flex items-start gap-2.5">
+                {/* Status icon */}
+                <div className={`mt-0.5 shrink-0 ${isActive ? "text-accent" : ""}`}>
+                  {showStatusDot ? (
+                    <span className="block h-2.5 w-2.5 rounded-full bg-info shadow-[0_0_6px_rgba(37,99,235,0.5)] animate-pulse" />
+                  ) : (
+                    <SessionIcon status={session.status} />
+                  )}
+                </div>
+
+                {/* Text content */}
+                <div className="min-w-0 flex-1">
+                  {/* Title row */}
+                  <div className="mb-1 flex items-center gap-1.5">
                     {isRenaming ? (
                       <input
                         ref={renameInputRef}
@@ -307,50 +365,58 @@ export function Sidebar({
                           if (e.key === "Escape") handleRenameCancel();
                         }}
                         onBlur={handleRenameSave}
-                        className="flex-1 min-w-0 rounded-lg border border-border bg-background px-2 py-1 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                        className="flex-1 min-w-0 rounded-lg border border-border bg-surface px-2 py-1 text-sm font-medium text-ink-800 focus:outline-none focus:ring-2 focus:ring-accent/30"
                       />
                     ) : (
-                      <h3 className="text-sm font-medium text-foreground truncate">
-                        {session.title}
+                      <h3 className="text-sm font-medium text-ink-800 truncate leading-snug">
+                        <TruncatedTitle title={session.title} />
                       </h3>
                     )}
                   </div>
 
-                  {/* Meta row: time + status label */}
-                  <div className="flex min-w-0 items-center gap-2 text-xs text-muted-light">
-                    {showRelativeTime && (
-                      <span className="whitespace-nowrap">{formatRelativeTime(session.updatedAt)}</span>
+                  {/* Meta row: time + status */}
+                  <div className="flex items-center gap-2 text-[11px] leading-none">
+                    {showStatusDot ? (
+                      <span className="text-info font-medium">Running</span>
+                    ) : (
+                      <>
+                        <span className="text-muted-light">{formatRelativeTime(session.updatedAt)}</span>
+                        <span className="text-muted-light/70 uppercase tracking-wide">
+                          {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                        </span>
+                      </>
                     )}
-                    <span className="text-[10px] uppercase tracking-wider whitespace-nowrap">
-                      {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-                    </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Actions overlay */}
-              <div className={`absolute right-1.5 top-1.5 transition-opacity ${
-                isRenaming ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"
-              }`}>
-                <button
-                  ref={actionButtonRef}
-                  onClick={(e) => openMenu(e, session)}
-                  className="p-1.5 rounded-lg bg-surface-raised text-secondary hover:bg-surface transition-colors"
-                  aria-label="Open session menu"
-                >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
-                    <circle cx="5" cy="12" r="1.7" />
-                    <circle cx="12" cy="12" r="1.7" />
-                    <circle cx="19" cy="12" r="1.7" />
-                  </svg>
-                </button>
+                {/* Actions button — always visible on active, hover on others */}
+                <div className={`shrink-0 transition-opacity ${
+                  isRenaming ? "opacity-0 pointer-events-none" : ""
+                }`}>
+                  <button
+                    ref={actionButtonRef}
+                    onClick={(e) => openMenu(e, session)}
+                    className={`rounded-lg p-1.5 transition-colors ${
+                      isActive
+                        ? "opacity-100 text-accent hover:bg-accent-subtle"
+                        : "opacity-0 group-hover:opacity-100 text-muted hover:bg-surface hover:text-ink-700"
+                    }`}
+                    aria-label="Open session menu"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                      <circle cx="5" cy="12" r="1.5" />
+                      <circle cx="12" cy="12" r="1.5" />
+                      <circle cx="19" cy="12" r="1.5" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Context menu */}
               {menuPosition && menuSessionId === session.id && (
                 <div
                   ref={menuRef}
-                  className="fixed z-50 w-max min-w-[124px] max-w-[calc(100vw-16px)] rounded-xl border border-ink-900/10 bg-white shadow-lg overflow-hidden"
+                  className="fixed z-50 w-max min-w-[140px] max-w-[calc(100vw-16px)] rounded-xl border border-ink-900/10 bg-surface shadow-elevated overflow-hidden"
                   style={{ top: menuPosition.y, right: menuPosition.right }}
                 >
                   {getMenuItems(session).map((item) => (
@@ -358,7 +424,7 @@ export function Sidebar({
                       key={item.key}
                       type="button"
                       onClick={item.onClick}
-                      className={`w-full flex items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm transition-colors hover:bg-surface-tertiary ${
+                      className={`w-full flex items-center gap-2.5 whitespace-nowrap px-3 py-2 text-left text-sm transition-colors hover:bg-surface-tertiary ${
                         item.danger ? "text-error" : "text-ink-700"
                       }`}
                     >
@@ -408,7 +474,7 @@ export function Sidebar({
         })}
 
         {/* Bottom gradient fade indicator */}
-        <div className="pointer-events-none absolute bottom-0 left-4 right-4 z-10 h-6 bg-gradient-to-t from-[#FAF9F6] to-transparent" />
+        <div className="pointer-events-none absolute bottom-0 left-3 right-3 z-10 h-6 bg-gradient-to-t from-surface-cream to-transparent" />
       </div>
 
       {/* Resume dialog */}
