@@ -19,45 +19,35 @@ type MenuItem = {
 };
 
 // ---------------------------------------------------------------------------
-// Session icon by status
+// Session icon by status (compact circle indicator)
 // ---------------------------------------------------------------------------
 
-const SessionIcon = ({ status }: { status: string }) => {
+const StatusDot = ({ status, active }: { status: string; active?: boolean }) => {
   if (status === "running") {
     return (
-      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-info" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 6v6l4 2" strokeLinecap="round" />
-      </svg>
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-info opacity-75" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-info" />
+      </span>
     );
   }
   if (status === "error") {
-    return (
-      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-error" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M15 9l-6 6M9 9l6 6" strokeLinecap="round" />
-      </svg>
-    );
+    return <span className="block h-2.5 w-2.5 shrink-0 rounded-full bg-error" />;
   }
   // completed / idle
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-muted-light" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="12" cy="12" r="10" />
-    </svg>
-  );
+  return <span className={`block h-2.5 w-2.5 shrink-0 rounded-full ${active ? "bg-accent/40" : "bg-muted-light/40"}`} />;
 };
 
 // ---------------------------------------------------------------------------
-// Truncated title — keeps the end of long titles
+// Truncated title — keeps the beginning of long titles
 // ---------------------------------------------------------------------------
 
-function TruncatedTitle({ title, maxLength = 24 }: { title: string; maxLength?: number }) {
+function TruncatedTitle({ title, maxLength = 22 }: { title: string; maxLength?: number }) {
   if (title.length <= maxLength) return <span>{title}</span>;
   return (
     <>
+      <span>{title.slice(0, maxLength)}</span>
       <span className="text-muted-light">…</span>
-      <span>{title.slice(-maxLength + 1)}</span>
     </>
   );
 }
@@ -321,9 +311,9 @@ export function Sidebar({
           return (
             <div
               key={session.id}
-              className={`group relative my-0.5 rounded-xl p-3 cursor-pointer transition-all duration-150 ${
+              className={`group relative my-1 rounded-xl p-3 cursor-pointer transition-all duration-150 ${
                 isActive
-                  ? "bg-accent-subtle shadow-subtle"
+                  ? "bg-surface-raised shadow-sm ring-1 ring-accent/15"
                   : "hover:bg-surface-tertiary"
               }`}
               onClick={() => {
@@ -340,20 +330,13 @@ export function Sidebar({
               role="button"
               tabIndex={0}
             >
-              <div className="flex items-start gap-2.5">
-                {/* Status icon */}
-                <div className={`mt-0.5 shrink-0 ${isActive ? "text-accent" : ""}`}>
-                  {showStatusDot ? (
-                    <span className="block h-2.5 w-2.5 rounded-full bg-info shadow-[0_0_6px_rgba(37,99,235,0.5)] animate-pulse" />
-                  ) : (
-                    <SessionIcon status={session.status} />
-                  )}
-                </div>
-
-                {/* Text content */}
-                <div className="min-w-0 flex-1">
-                  {/* Title row */}
-                  <div className="mb-1 flex items-center gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                {/* Left: status dot + title */}
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <StatusDot status={session.status} active={isActive} />
+                  <h3 className={`truncate text-[13px] font-medium leading-snug ${
+                    isActive ? "text-ink-900" : "text-ink-800"
+                  }`}>
                     {isRenaming ? (
                       <input
                         ref={renameInputRef}
@@ -365,50 +348,42 @@ export function Sidebar({
                           if (e.key === "Escape") handleRenameCancel();
                         }}
                         onBlur={handleRenameSave}
-                        className="flex-1 min-w-0 rounded-lg border border-border bg-surface px-2 py-1 text-sm font-medium text-ink-800 focus:outline-none focus:ring-2 focus:ring-accent/30"
+                        className="w-full bg-transparent focus:outline-none focus:ring-2 focus:ring-accent/30 rounded px-1 -mx-1"
                       />
                     ) : (
-                      <h3 className="text-sm font-medium text-ink-800 truncate leading-snug">
-                        <TruncatedTitle title={session.title} />
-                      </h3>
+                      <TruncatedTitle title={session.title} />
                     )}
-                  </div>
-
-                  {/* Meta row: time + status */}
-                  <div className="flex items-center gap-2 text-[11px] leading-none">
-                    {showStatusDot ? (
-                      <span className="text-info font-medium">Running</span>
-                    ) : (
-                      <>
-                        <span className="text-muted-light">{formatRelativeTime(session.updatedAt)}</span>
-                        <span className="text-muted-light/70 uppercase tracking-wide">
-                          {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                  </h3>
                 </div>
 
-                {/* Actions button — always visible on active, hover on others */}
-                <div className={`shrink-0 transition-opacity ${
-                  isRenaming ? "opacity-0 pointer-events-none" : ""
-                }`}>
-                  <button
-                    ref={actionButtonRef}
-                    onClick={(e) => openMenu(e, session)}
-                    className={`rounded-lg p-1.5 transition-colors ${
-                      isActive
-                        ? "opacity-100 text-accent hover:bg-accent-subtle"
-                        : "opacity-0 group-hover:opacity-100 text-muted hover:bg-surface hover:text-ink-700"
-                    }`}
-                    aria-label="Open session menu"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
-                      <circle cx="5" cy="12" r="1.5" />
-                      <circle cx="12" cy="12" r="1.5" />
-                      <circle cx="19" cy="12" r="1.5" />
-                    </svg>
-                  </button>
+                {/* Right: actions + meta */}
+                <div className="flex shrink-0 items-center gap-2">
+                  {/* Relative time */}
+                  {!showStatusDot && (
+                    <span className="text-[11px] text-muted-light tabular-nums">
+                      {formatRelativeTime(session.updatedAt)}
+                    </span>
+                  )}
+
+                  {/* Actions button */}
+                  <div className={`shrink-0 transition-opacity ${isRenaming ? "opacity-0 pointer-events-none" : ""}`}>
+                    <button
+                      ref={actionButtonRef}
+                      onClick={(e) => openMenu(e, session)}
+                      className={`rounded-lg p-1.5 transition-colors ${
+                        isActive
+                          ? "opacity-60 hover:opacity-100 text-ink-700 hover:bg-surface"
+                          : "opacity-0 group-hover:opacity-60 text-ink-700 hover:opacity-100 hover:bg-surface"
+                      }`}
+                      aria-label="Open session menu"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor">
+                        <circle cx="5" cy="12" r="1.5" />
+                        <circle cx="12" cy="12" r="1.5" />
+                        <circle cx="19" cy="12" r="1.5" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
 
