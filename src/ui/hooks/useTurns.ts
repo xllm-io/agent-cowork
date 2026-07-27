@@ -144,30 +144,52 @@ function extractBlocksForTurn(
   for (const msg of assistantMessages) {
     if (msg.type !== "assistant") continue;
     const sdkMsg = msg as any;
-    // Support both possible SDK message structures: { message: { content } } and { content }
+
+    // Support multiple possible SDK message structures
     let contents: any[] = [];
     if (sdkMsg?.message?.content) {
       contents = sdkMsg.message.content;
     } else if (sdkMsg?.content) {
       contents = sdkMsg.content;
-    } else {
-      contents = [];
+    } else if (Array.isArray(sdkMsg?.text)) {
+      // Some variants may have text as array
+      contents = sdkMsg.text.map((t: string) => ({ type: 'text', text: t }));
+    } else if (sdkMsg?.text) {
+      contents = [{ type: 'text', text: String(sdkMsg.text) }];
+    } else if (sdkMsg?.output) {
+      contents = [{ type: 'text', text: String(sdkMsg.output) }];
     }
+
+    // If no structured content found but we have an assistant message, treat entire message as text
+    if (contents.length === 0 && typeof sdkMsg === 'object' && sdkMsg !== null) {
+      // Try to find any string property that might be the response
+      const value = Object.values(sdkMsg).find(v => typeof v === 'string');
+      if (value) {
+        contents = [{ type: 'text', text: value }];
+      }
+    }
+
     for (const block of contents) {
       if (!block) continue;
-      if (block.type === "thinking") {
-        blocks.push({ type: "thinking", output: block.thinking || "", status: "success" });
-      } else if (block.type === "text") {
-        blocks.push({ type: "text", output: block.text || "", status: "success" });
-      } else if (block.type === "tool_use") {
+      if (block.type === 'thinking') {
+        blocks.push({ type: 'thinking', output: block.thinking || '', status: 'success' });
+      } else if (block.type === 'text') {
+        blocks.push({ type: 'text', output: block.text || '', status: 'success' });
+      } else if (block.type === 'tool_use') {
         const info = getToolInfo(block);
         blocks.push({
-          type: "tool_use", id: block.id, name: block.name,
+          type: 'tool_use', id: block.id, name: block.name,
           command: info.command, filePath: info.filePath,
-          input: block.input, status: "pending",
+          input: block.input ?? {}, status: 'pending',
         });
       }
     }
+  }
+
+  // Fallback: if no blocks were extracted from assistant messages but there are any assistant messages,
+  // add a placeholder to ensure something renders (prevents completely blank assistant area)
+  if (blocks.length === 0 && assistantMessages.length > 0) {
+    blocks.push({ type: 'text', output: '', status: 'success' });
   }
 
   // 2) If no assembled blocks yet (streaming in progress), use partials
@@ -192,12 +214,15 @@ function extractTools(messages: StreamMessage[]): string[] {
   for (const msg of messages) {
     if (msg.type !== "assistant") continue;
     const sdkMsg = msg as any;
-    // Get contents supporting both .message.content and .content shapes
+    // Get contents supporting multiple possible structures
     let contents: any[] = [];
     if (sdkMsg?.message?.content) {
       contents = sdkMsg.message.content;
     } else if (sdkMsg?.content) {
       contents = sdkMsg.content;
+    } else if (sdkMsg?.text) {
+      // Assume text array might contain tool_use descriptors? unlikely but safe
+      contents = [];
     }
     for (const block of contents) {
       if (block?.type === "tool_use" && block?.name) {
@@ -216,12 +241,16 @@ function extractText(messages: StreamMessage[]): string {
   for (const msg of messages) {
     if (msg.type !== "assistant") continue;
     const sdkMsg = msg as any;
-    // Get contents supporting both .message.content and .content shapes
+    // Get contents supporting multiple possible structures
     let contents: any[] = [];
     if (sdkMsg?.message?.content) {
       contents = sdkMsg.message.content;
     } else if (sdkMsg?.content) {
       contents = sdkMsg.content;
+    } else if (sdkMsg?.text) {
+      // If text is a string directly, use it
+      text += (typeof sdkMsg.text === 'string' ? sdkMsg.text : '');
+      continue;
     }
     for (const block of contents) {
       if (block?.type === "text" && block?.text) {
@@ -239,7 +268,7 @@ function hasThinking(messages: StreamMessage[]): boolean {
   for (const msg of messages) {
     if (msg.type !== "assistant") continue;
     const sdkMsg = msg as any;
-    // Get contents supporting both .message.content and .content shapes
+    // Get contents supporting multiple possible structures
     let contents: any[] = [];
     if (sdkMsg?.message?.content) {
       contents = sdkMsg.message.content;

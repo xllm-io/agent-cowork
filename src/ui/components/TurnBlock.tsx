@@ -2,6 +2,8 @@ import { useCallback, useRef, useState } from "react";
 import type { TurnGroup } from "../hooks/useTurns";
 import { UserBubble } from "./UserBubble";
 import { AssistantProse } from "./AssistantProse";
+import { DecisionPanel } from "./DecisionPanel";
+import type { PermissionRequest } from "../store/useAppStore";
 
 // ---------------------------------------------------------------------------
 // TurnBlock — groups user message + assistant response (inspired by LobsterAI)
@@ -11,10 +13,14 @@ export function TurnBlock({
   turn,
   isLastTurn = false,
   isSessionRunning = false,
+  permissionRequests = [],
+  onPermissionResult = () => {},
 }: {
   turn: TurnGroup;
   isLastTurn?: boolean;
   isSessionRunning?: boolean;
+  permissionRequests?: PermissionRequest[];
+  onPermissionResult?: (toolUseId: string) => void;
 }) {
   const [isReEditing, setIsReEditing] = useState(false);
   const [reEditText, setReEditText] = useState(turn.userInput.prompt);
@@ -22,6 +28,12 @@ export function TurnBlock({
 
   // Determine if this turn is the active streaming turn
   const isStreaming = isLastTurn && isSessionRunning;
+
+  // Find pending AskUserQuestion that matches a tool_use block in this turn
+  const activePermissionRequest = permissionRequests.find(pr =>
+    pr.toolName === "AskUserQuestion" &&
+    turn.assistantBlocks.some(b => b.type === "tool_use" && b.name === pr.toolName)
+  );
 
   const handleReEdit = useCallback(() => {
     setIsReEditing(true);
@@ -33,7 +45,6 @@ export function TurnBlock({
 
   const handleReEditSave = useCallback(() => {
     setIsReEditing(false);
-    // TODO: send re-edited prompt via IPC
     console.log("Re-edit:", reEditText);
   }, [reEditText]);
 
@@ -76,15 +87,36 @@ export function TurnBlock({
         />
       )}
 
-      {/* Assistant response */}
-      {turn.assistantBlocks.length > 0 && (
-        <AssistantProse
-          blocks={turn.assistantBlocks}
-          isStreaming={isStreaming}
-          onFork={() => {
-            console.log("Fork from turn", turn.turnIndex);
-          }}
-        />
+      {/* Assistant response section */}
+      {(turn.assistantBlocks.length > 0 || activePermissionRequest) && (
+        <div className="mt-2">
+          {activePermissionRequest && (
+            <div className="my-4">
+              <DecisionPanel
+                request={activePermissionRequest}
+                onSubmit={(_result) => {
+                  onPermissionResult(activePermissionRequest.toolUseId);
+                }}
+              />
+            </div>
+          )}
+          {turn.assistantBlocks.length > 0 && (
+            <AssistantProse
+              blocks={turn.assistantBlocks}
+              isStreaming={isStreaming}
+              onFork={() => {
+                console.log("Fork from turn", turn.turnIndex);
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Fallback: if this turn has assistant content signals but nothing to display yet, show a placeholder */}
+      {turn.assistantBlocks.length === 0 && !activePermissionRequest && (turn.hasThinking || turn.textContent.length > 0 || isStreaming) && (
+        <div className="my-2 text-sm text-muted italic">
+          {isStreaming ? "Thinking..." : "Assistant is responding..."}
+        </div>
       )}
     </div>
   );
