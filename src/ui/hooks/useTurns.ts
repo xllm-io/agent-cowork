@@ -144,7 +144,15 @@ function extractBlocksForTurn(
   for (const msg of assistantMessages) {
     if (msg.type !== "assistant") continue;
     const sdkMsg = msg as any;
-    const contents = sdkMsg?.message?.content || [];
+    // Support both possible SDK message structures: { message: { content } } and { content }
+    let contents: any[] = [];
+    if (sdkMsg?.message?.content) {
+      contents = sdkMsg.message.content;
+    } else if (sdkMsg?.content) {
+      contents = sdkMsg.content;
+    } else {
+      contents = [];
+    }
     for (const block of contents) {
       if (!block) continue;
       if (block.type === "thinking") {
@@ -184,7 +192,13 @@ function extractTools(messages: StreamMessage[]): string[] {
   for (const msg of messages) {
     if (msg.type !== "assistant") continue;
     const sdkMsg = msg as any;
-    const contents = sdkMsg?.message?.content || [];
+    // Get contents supporting both .message.content and .content shapes
+    let contents: any[] = [];
+    if (sdkMsg?.message?.content) {
+      contents = sdkMsg.message.content;
+    } else if (sdkMsg?.content) {
+      contents = sdkMsg.content;
+    }
     for (const block of contents) {
       if (block?.type === "tool_use" && block?.name) {
         tools.add(block.name);
@@ -202,7 +216,13 @@ function extractText(messages: StreamMessage[]): string {
   for (const msg of messages) {
     if (msg.type !== "assistant") continue;
     const sdkMsg = msg as any;
-    const contents = sdkMsg?.message?.content || [];
+    // Get contents supporting both .message.content and .content shapes
+    let contents: any[] = [];
+    if (sdkMsg?.message?.content) {
+      contents = sdkMsg.message.content;
+    } else if (sdkMsg?.content) {
+      contents = sdkMsg.content;
+    }
     for (const block of contents) {
       if (block?.type === "text" && block?.text) {
         text += block.text;
@@ -219,7 +239,13 @@ function hasThinking(messages: StreamMessage[]): boolean {
   for (const msg of messages) {
     if (msg.type !== "assistant") continue;
     const sdkMsg = msg as any;
-    const contents = sdkMsg?.message?.content || [];
+    // Get contents supporting both .message.content and .content shapes
+    let contents: any[] = [];
+    if (sdkMsg?.message?.content) {
+      contents = sdkMsg.message.content;
+    } else if (sdkMsg?.content) {
+      contents = sdkMsg.content;
+    }
     for (const block of contents) {
       if (block?.type === "thinking") return true;
     }

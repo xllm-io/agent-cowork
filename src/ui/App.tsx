@@ -438,6 +438,10 @@ function App() {
                     turn={turn}
                     isLastTurn={turnIdx === visibleTurns.length - 1}
                     isSessionRunning={isRunning}
+                    permissionRequests={permissionRequests}
+                    onPermissionResult={(toolUseId: string) => {
+                      sendEvent({ type: "permission.response", payload: { sessionId: activeSessionId || "", toolUseId, result: { behavior: "allow" } } });
+                    }}
                   />
                 ))
               )}
