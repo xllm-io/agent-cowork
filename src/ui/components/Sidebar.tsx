@@ -81,7 +81,7 @@ export function Sidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ right: number; y: number } | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ right: number; top?: number; bottom?: number } | null>(null);
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
@@ -317,7 +317,31 @@ export function Sidebar({
     }
     setMenuSessionId(session.id);
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setMenuPosition({ right: Math.max(8, window.innerWidth - rect.right), y: rect.bottom + 8 });
+
+    // Calculate available space below and above the button
+    const belowSpace = window.innerHeight - rect.bottom;
+    const aboveSpace = rect.top;
+    const menuHeight = 250; // approximate max menu height with padding
+
+    let top: number;
+
+    // Prefer positioning below the button if enough space
+    if (belowSpace >= menuHeight + 8) {
+      top = rect.bottom + 8;
+    } else if (aboveSpace >= menuHeight) {
+      // Not enough room below but enough above - position above
+      top = rect.top - menuHeight;
+    } else {
+      // Both spaces limited - try below but clamp to viewport
+      top = Math.min(rect.bottom + 8, window.innerHeight - menuHeight);
+    }
+
+    // Ensure menu doesn't go off top of screen
+    if (top < 0) {
+      top = rect.bottom + 8;
+    }
+
+    setMenuPosition({ right: Math.max(8, window.innerWidth - rect.right), top });
     setDeleteConfirmId(null);
   };
 
@@ -413,8 +437,8 @@ export function Sidebar({
         {menuPosition && menuSessionId === session.id && (
           <div
             ref={menuRef}
-            className="fixed z-50 w-max min-w-[140px] max-w-[calc(100vw-16px)] rounded-xl border border-ink-900/10 bg-surface shadow-elevated overflow-hidden"
-            style={{ top: menuPosition.y, right: menuPosition.right }}
+            className="fixed z-50 w-max min-w-[140px] max-w-[calc(100vw-16px)] rounded-xl border border-ink-900/10 bg-surface shadow-elevated overflow-y-auto"
+            style={{ top: menuPosition.top, right: menuPosition.right }}
           >
             {getMenuItems(session).map((item) => (
               <button
