@@ -46,8 +46,6 @@ function App() {
   const [formPrompt, setFormPrompt] = useState(prompt);
   const [formModel, setFormModel] = useState("");
   const [showDirPicker, setShowDirPicker] = useState(false);
-  // Task mode: "project" requires a working directory; "conversation" runs without one.
-  const [taskMode, setTaskMode] = useState<"project" | "conversation">("project");
   const dirPickerRef = useRef<HTMLDivElement>(null);
 
   // Auto-close directory picker on outside click / escape
@@ -223,12 +221,8 @@ function App() {
   const canUserInteract = activeSessionId && visibleMessages.length > 0;
 
   // Start a new session from the inline form (LobsterAI CoworkView pattern)
+  // Task type is auto-derived: a chosen directory → project task; none → conversation task.
   const handleCreateSession = useCallback(async () => {
-    // Project mode requires a working directory; conversation mode does not.
-    if (taskMode === "project" && !formCwd.trim()) {
-      setGlobalError("Working Directory is required for a project task. Switch to Conversation mode to chat without one.");
-      return;
-    }
     if (!formPrompt.trim()) {
       setGlobalError("Prompt is required to start a session.");
       return;
@@ -251,27 +245,24 @@ function App() {
       payload: {
         title,
         prompt: formPrompt.trim(),
-        // Conversation mode sends no cwd — the backend creates a temp sandbox dir.
-        cwd: taskMode === "project" ? (formCwd || undefined) : undefined,
+        // No directory → conversation task (backend leaves cwd empty).
+        cwd: formCwd.trim() || undefined,
         allowedTools: "Read,Edit,Bash",
       }
     });
 
     // Clear form state
     setFormPrompt("");
-  }, [taskMode, formCwd, formPrompt, sendEvent, setGlobalError]);
+  }, [formCwd, formPrompt, sendEvent, setGlobalError]);
 
   // Quick templates for the home screen
   const QUICK_TEMPLATES = [
-    { label: "Explain code", prompt: "Please explain the code in this project and its architecture.", mode: "project" as const },
-    { label: "Write tests", prompt: "Write comprehensive tests for the main functionality in this project.", mode: "project" as const },
-    { label: "Debug issue", prompt: "Help me debug an issue. I'll describe the problem.", mode: "project" as const },
-    { label: "Refactor", prompt: "Help me refactor this codebase for better readability and performance.", mode: "project" as const },
-    { label: "Chat / Q&A", prompt: "I'd like to have a general discussion or ask some questions.", mode: "conversation" as const },
+    { label: "Explain code", prompt: "Please explain the code in this project and its architecture." },
+    { label: "Write tests", prompt: "Write comprehensive tests for the main functionality in this project." },
+    { label: "Debug issue", prompt: "Help me debug an issue. I'll describe the problem." },
+    { label: "Refactor", prompt: "Help me refactor this codebase for better readability and performance." },
+    { label: "Chat / Q&A", prompt: "I'd like to have a general discussion or ask some questions." },
   ];
-
-  // Filter templates by current mode
-  const filteredTemplates = QUICK_TEMPLATES.filter(tpl => tpl.mode === taskMode);
 
   return (
     <div className="flex h-screen bg-surface">
@@ -301,43 +292,8 @@ function App() {
                 <HomeScreen />
               </div>
 
-              {/* Task mode toggle — Project (with directory) vs Conversation (no directory) */}
-              <div
-                className="mt-7 flex items-center gap-1 rounded-full border border-ink-900/10 bg-surface p-1 animate-fade-in-up"
-                style={{ animationDelay: "150ms", animationFillMode: "both" }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setTaskMode("project")}
-                  className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[13px] font-medium transition-all duration-200 ${
-                    taskMode === "project"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-muted hover:text-ink-700"
-                  }`}
-                >
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                  </svg>
-                  Project
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTaskMode("conversation")}
-                  className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[13px] font-medium transition-all duration-200 ${
-                    taskMode === "conversation"
-                      ? "bg-accent text-white shadow-sm"
-                      : "text-muted hover:text-ink-700"
-                  }`}
-                >
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Conversation
-                </button>
-              </div>
-
               {/* Large Prompt Input Area — LobsterAI CoworkPromptInput size="large" pattern */}
-              <div className="relative z-30 mt-4 w-full max-w-3xl animate-fade-in-up" style={{ animationDelay: "180ms", animationFillMode: "both" }}>
+              <div className="relative z-30 mt-9 w-full max-w-3xl animate-fade-in-up" style={{ animationDelay: "180ms", animationFillMode: "both" }}>
                 <div className="rounded-2xl border border-border bg-surface shadow-card focus-within:border-accent/30 focus-within:shadow-elevated transition-all duration-200">
                   <textarea
                     rows={2}
@@ -354,44 +310,6 @@ function App() {
                   />
                   <div className="relative flex items-center justify-between gap-3 px-4 pb-2 pt-1">
                     <div className="flex shrink-0 items-center gap-3">
-                      {/* Folder selector — only in project mode */}
-                      {taskMode === "project" && (
-                        <div ref={dirPickerRef} className="relative min-w-0 shrink">
-                          <button
-                            type="button"
-                            onClick={() => setShowDirPicker(!showDirPicker)}
-                            className={`flex h-7 items-center gap-1.5 rounded-lg px-2 text-[13px] transition-colors ${
-                              formCwd ? "text-secondary hover:bg-background/80 hover:text-foreground" : "text-muted"
-                            }`}
-                            title={formCwd || "Select a working directory"}
-                          >
-                            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8">
-                              <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                            </svg>
-                            <span className="min-w-0 truncate max-w-[200px]">
-                              {formCwd ? formCwd.split('/').filter(Boolean).slice(-2).join('/') : "Select folder"}
-                            </span>
-                          </button>
-                          {showDirPicker && (
-                            <DirectoryPickerPopover
-                              value={formCwd}
-                              onChange={(path) => { setFormCwd(path); setShowDirPicker(false); }}
-                              onClose={() => setShowDirPicker(false)}
-                            />
-                          )}
-                        </div>
-                      )}
-
-                      {/* Conversation mode hint */}
-                      {taskMode === "conversation" && (
-                        <span className="flex h-7 items-center gap-1.5 px-2 text-[13px] text-muted">
-                          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                          No working directory needed
-                        </span>
-                      )}
-
                       {/* Model selector */}
                       <div className="relative min-w-0 shrink">
                         <input
@@ -426,11 +344,60 @@ function App() {
                     </button>
                   </div>
                 </div>
+
+                {/* Directory selector — below the input; optional. No directory → conversation task. */}
+                <div ref={dirPickerRef} className="relative mt-2.5 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDirPicker(!showDirPicker)}
+                    className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[13px] transition-colors ${
+                      formCwd
+                        ? "border-accent/30 bg-accent/5 text-ink-700 hover:border-accent/50"
+                        : "border-ink-900/10 bg-surface text-muted hover:border-ink-900/20 hover:text-ink-700"
+                    }`}
+                    title={formCwd || "Select a working directory (optional)"}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                    <span className="min-w-0 truncate max-w-[280px]">
+                      {formCwd ? formCwd.split('/').filter(Boolean).slice(-2).join('/') : "Add working directory (optional)"}
+                    </span>
+                  </button>
+
+                  {/* Clear selection → reverts to conversation task */}
+                  {formCwd && (
+                    <button
+                      type="button"
+                      onClick={() => setFormCwd("")}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-tertiary hover:text-ink-700 transition-colors"
+                      title="Clear directory (switch to conversation task)"
+                      aria-label="Clear directory"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  )}
+
+                  {/* Task type hint */}
+                  <span className="text-[12px] text-muted-light">
+                    {formCwd ? "Project task" : "Conversation task"}
+                  </span>
+
+                  {showDirPicker && (
+                    <DirectoryPickerPopover
+                      value={formCwd}
+                      onChange={(path) => { setFormCwd(path); setShowDirPicker(false); }}
+                      onClose={() => setShowDirPicker(false)}
+                    />
+                  )}
+                </div>
               </div>
 
               {/* Quick Action Chips — LobsterAI QuickActionBar pattern */}
               <div className="relative z-0 mt-8 flex w-full max-w-3xl flex-wrap justify-center gap-2 animate-fade-in-up" style={{ animationDelay: "260ms", animationFillMode: "both" }}>
-                {filteredTemplates.map((action) => (
+                {QUICK_TEMPLATES.map((action) => (
                   <button
                     key={action.label}
                     type="button"

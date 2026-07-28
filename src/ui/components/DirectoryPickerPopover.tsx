@@ -108,7 +108,7 @@ export function DirectoryPickerPopover({
   return (
     <div
       ref={popoverRef}
-      className="absolute bottom-full left-0 z-50 mb-2 w-[320px] rounded-xl border border-ink-900/10 bg-surface shadow-elevated overflow-hidden animate-fade-in-up"
+      className="absolute top-full left-0 z-50 mt-2 w-[320px] rounded-xl border border-ink-900/10 bg-surface shadow-elevated overflow-hidden animate-fade-in-up"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-ink-900/5">
