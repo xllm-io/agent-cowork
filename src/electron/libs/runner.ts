@@ -4,6 +4,9 @@ import type { Session } from "./session-store.js";
 
 import { getCurrentApiConfig, buildEnvForConfig, getClaudeCodePath} from "./claude-settings.js";
 import { getEnhancedEnv } from "./util.js";
+import { mkdtemp } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 
 
 export type RunnerOptions = {
@@ -59,11 +62,21 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         ...getEnhancedEnv(),
         ...env
       };
-      
+
+      // Conversation sessions have no cwd — give the agent a temporary sandbox dir.
+      let effectiveCwd = session.cwd;
+      if (!effectiveCwd) {
+        try {
+          effectiveCwd = await mkdtemp(join(tmpdir(), "cowork-conversation-"));
+        } catch {
+          effectiveCwd = DEFAULT_CWD;
+        }
+      }
+
       const q = query({
         prompt,
         options: {
-          cwd: session.cwd ?? DEFAULT_CWD,
+          cwd: effectiveCwd,
           resume: resumeSessionId,
           abortController,
           env: mergedEnv,
