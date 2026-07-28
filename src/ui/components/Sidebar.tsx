@@ -322,26 +322,38 @@ export function Sidebar({
     const belowSpace = window.innerHeight - rect.bottom;
     const aboveSpace = rect.top;
     const menuHeight = 250; // approximate max menu height with padding
+    const menuPadding = 8;
 
     let top: number;
+    let right: number = Math.max(menuPadding, window.innerWidth - rect.right);
 
     // Prefer positioning below the button if enough space
-    if (belowSpace >= menuHeight + 8) {
-      top = rect.bottom + 8;
-    } else if (aboveSpace >= menuHeight + 8 * 2) {
+    if (belowSpace >= menuHeight + menuPadding) {
+      top = rect.bottom + menuPadding;
+    } else if (aboveSpace >= menuHeight + menuPadding * 2) {
       // Not enough room below but enough above - position above
-      top = rect.top - (menuHeight + 8);
+      top = rect.top - (menuHeight + menuPadding);
     } else {
       // Both spaces limited - try below but clamp to viewport
-      top = Math.min(rect.bottom + 8, window.innerHeight - menuHeight);
+      const clampedTop = Math.min(rect.bottom + menuPadding, window.innerHeight - menuHeight);
+      top = clampedTop > 0 ? clampedTop : menuPadding;
+    }
+
+    // Ensure menu stays within viewport horizontally
+    // Check if the menu would extend past the left edge
+    const buttonLeft = rect.left;
+    const menuWidthMin = 140; // min-w-[140px]
+    if (buttonLeft < menuWidthMin + menuPadding) {
+      // Shift menu so it aligns with the button's left edge
+      right = window.innerWidth - (buttonLeft + menuWidthMin - menuPadding);
     }
 
     // Ensure menu doesn't go off top of screen
     if (top < 0) {
-      top = Math.max(0, rect.bottom + 8);
+      top = Math.max(menuPadding, rect.bottom + menuPadding);
     }
 
-    setMenuPosition({ right: Math.max(8, window.innerWidth - rect.right), top });
+    setMenuPosition({ right, top });
     setDeleteConfirmId(null);
   };
 
