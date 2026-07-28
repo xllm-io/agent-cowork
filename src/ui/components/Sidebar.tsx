@@ -328,9 +328,9 @@ export function Sidebar({
     // Prefer positioning below the button if enough space
     if (belowSpace >= menuHeight + 8) {
       top = rect.bottom + 8;
-    } else if (aboveSpace >= menuHeight) {
+    } else if (aboveSpace >= menuHeight + 8 * 2) {
       // Not enough room below but enough above - position above
-      top = rect.top - menuHeight;
+      top = rect.top - (menuHeight + 8);
     } else {
       // Both spaces limited - try below but clamp to viewport
       top = Math.min(rect.bottom + 8, window.innerHeight - menuHeight);
@@ -338,7 +338,7 @@ export function Sidebar({
 
     // Ensure menu doesn't go off top of screen
     if (top < 0) {
-      top = rect.bottom + 8;
+      top = Math.max(0, rect.bottom + 8);
     }
 
     setMenuPosition({ right: Math.max(8, window.innerWidth - rect.right), top });
