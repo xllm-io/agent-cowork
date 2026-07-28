@@ -4,6 +4,8 @@ import { runClaude, type RunnerHandle } from "./libs/runner.js";
 import { SessionStore } from "./libs/session-store.js";
 import { app } from "electron";
 import { join } from "path";
+import { mkdtemp } from "fs/promises";
+import { tmpdir } from "os";
 
 let sessions: SessionStore;
 const runnerHandles = new Map<string, RunnerHandle>();
@@ -88,54 +90,69 @@ export function handleClientEvent(event: ClientEvent) {
   }
 
   if (event.type === "session.start") {
-    const session = sessions.createSession({
-      cwd: event.payload.cwd,
-      title: event.payload.title,
-      allowedTools: event.payload.allowedTools,
-      prompt: event.payload.prompt
-    });
-
-    sessions.updateSession(session.id, {
-      status: "running",
-      lastPrompt: event.payload.prompt
-    });
-    emit({
-      type: "session.status",
-      payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd }
-    });
-
-    emit({
-      type: "stream.user_prompt",
-      payload: { sessionId: session.id, prompt: event.payload.prompt }
-    });
-
-    runClaude({
-      prompt: event.payload.prompt,
-      session,
-      resumeSessionId: session.claudeSessionId,
-      onEvent: emit,
-      onSessionUpdate: (updates) => {
-        sessions.updateSession(session.id, updates);
+    // Conversation mode: no cwd provided → create a temporary sandbox dir so the
+    // agent still has a harmless working directory. Project mode: use the given cwd.
+    const startSession = async () => {
+      let cwd = event.payload.cwd;
+      if (!cwd) {
+        try {
+          cwd = await mkdtemp(join(tmpdir(), "cowork-conversation-"));
+        } catch (error) {
+          console.error("Failed to create temp dir for conversation session:", error);
+          cwd = undefined;
+        }
       }
-    })
-      .then((handle) => {
-        runnerHandles.set(session.id, handle);
-        sessions.setAbortController(session.id, undefined);
-      })
-      .catch((error) => {
-        sessions.updateSession(session.id, { status: "error" });
-        emit({
-          type: "session.status",
-          payload: {
-            sessionId: session.id,
-            status: "error",
-            title: session.title,
-            cwd: session.cwd,
-            error: String(error)
-          }
-        });
+
+      const session = sessions.createSession({
+        cwd,
+        title: event.payload.title,
+        allowedTools: event.payload.allowedTools,
+        prompt: event.payload.prompt
       });
 
+      sessions.updateSession(session.id, {
+        status: "running",
+        lastPrompt: event.payload.prompt
+      });
+      emit({
+        type: "session.status",
+        payload: { sessionId: session.id, status: "running", title: session.title, cwd: session.cwd }
+      });
+
+      emit({
+        type: "stream.user_prompt",
+        payload: { sessionId: session.id, prompt: event.payload.prompt }
+      });
+
+      runClaude({
+        prompt: event.payload.prompt,
+        session,
+        resumeSessionId: session.claudeSessionId,
+        onEvent: emit,
+        onSessionUpdate: (updates) => {
+          sessions.updateSession(session.id, updates);
+        }
+      })
+        .then((handle) => {
+          runnerHandles.set(session.id, handle);
+          sessions.setAbortController(session.id, undefined);
+        })
+        .catch((error) => {
+          sessions.updateSession(session.id, { status: "error" });
+          emit({
+            type: "session.status",
+            payload: {
+              sessionId: session.id,
+              status: "error",
+              title: session.title,
+              cwd: session.cwd,
+              error: String(error)
+            }
+          });
+        });
+    };
+
+    void startSession();
     return;
   }
 
