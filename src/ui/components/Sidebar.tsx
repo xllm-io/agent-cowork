@@ -311,11 +311,12 @@ export function Sidebar({
           return (
             <div
               key={session.id}
-              className={`group relative my-1 rounded-xl p-3 cursor-pointer transition-all duration-150 ${
+              className={`group relative my-1 rounded-xl cursor-pointer transition-all duration-150 ${
                 isActive
                   ? "bg-surface-raised shadow-sm ring-1 ring-accent/15"
                   : "hover:bg-surface-tertiary"
               }`}
+              style={{ padding: '6px 10px' }}
               onClick={() => {
                 if (isRenaming) return;
                 setActiveSessionId(session.id);
@@ -334,7 +335,7 @@ export function Sidebar({
                 {/* Left: status dot + title */}
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <StatusDot status={session.status} active={isActive} />
-                  <h3 className={`truncate text-[13px] font-medium leading-snug ${
+                  <h3 className={`truncate text-[14px] leading-normal ${
                     isActive ? "text-ink-900" : "text-ink-800"
                   }`}>
                     {isRenaming ? (
@@ -360,7 +361,7 @@ export function Sidebar({
                 <div className="flex shrink-0 items-center gap-2">
                   {/* Relative time */}
                   {!showStatusDot && (
-                    <span className="text-[11px] text-muted-light tabular-nums">
+                    <span className="text-xs text-muted-light tabular-nums">
                       {formatRelativeTime(session.updatedAt)}
                     </span>
                   )}
@@ -377,7 +378,7 @@ export function Sidebar({
                       }`}
                       aria-label="Open session menu"
                     >
-                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor">
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
                         <circle cx="5" cy="12" r="1.5" />
                         <circle cx="12" cy="12" r="1.5" />
                         <circle cx="19" cy="12" r="1.5" />
