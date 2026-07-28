@@ -452,7 +452,16 @@ function App() {
               )}
 
               {visibleTurns.length === 0 ? (
-                <HomeScreen />
+                // While session is initializing/loading, show a loading state
+                // instead of the home screen to avoid confusion
+                isRunning ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-muted">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mb-3"></div>
+                    <p className="text-sm">Agent Cowork is getting started...</p>
+                  </div>
+                ) : (
+                  <HomeScreen />
+                )
               ) : (
                 visibleTurns.map((turn, turnIdx) => (
                   <TurnBlock
