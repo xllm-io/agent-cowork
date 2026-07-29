@@ -47,6 +47,21 @@ function App() {
   const [formModel, setFormModel] = useState("");
   const [showDirPicker, setShowDirPicker] = useState(false);
   const dirPickerRef = useRef<HTMLDivElement>(null);
+  const homePromptRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Auto-grow the home-screen prompt textarea up to 12 rows, then scroll.
+  useEffect(() => {
+    const el = homePromptRef.current;
+    if (!el) return;
+    const style = window.getComputedStyle(el);
+    const lineHeight = parseFloat(style.lineHeight) || 22;
+    const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const maxHeight = lineHeight * 12 + paddingY;
+    el.style.height = "auto";
+    const next = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [formPrompt]);
 
   // Auto-close directory picker on outside click / escape
   useEffect(() => {
@@ -296,8 +311,9 @@ function App() {
               <div className="relative z-30 mt-9 w-full max-w-3xl animate-fade-in-up" style={{ animationDelay: "180ms", animationFillMode: "both" }}>
                 <div className="rounded-2xl border border-border bg-surface shadow-card focus-within:border-accent/30 focus-within:shadow-elevated transition-all duration-200">
                   <textarea
+                    ref={homePromptRef}
                     rows={2}
-                    className="w-full resize-none bg-transparent px-4 pb-2 pt-3 text-sm leading-relaxed text-ink-800 placeholder:text-muted focus:outline-none min-h-[52px] max-h-[200px]"
+                    className="w-full resize-none bg-transparent px-4 pb-2 pt-3 text-sm leading-relaxed text-ink-800 placeholder:text-muted focus:outline-none min-h-[52px]"
                     placeholder="Describe what you want agent to handle..."
                     value={formPrompt}
                     onChange={(e) => setFormPrompt(e.target.value)}
@@ -308,18 +324,28 @@ function App() {
                       }
                     }}
                   />
-                  <div className="relative flex items-center justify-between gap-3 px-4 pb-2 pt-1">
-                    <div className="flex shrink-0 items-center gap-3">
+                  <div className="relative flex items-center justify-between gap-3 px-3 pb-2.5 pt-1">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
                       {/* Model selector */}
-                      <div className="relative min-w-0 shrink">
-                        <input
-                          type="text"
-                          className="flex h-7 items-center rounded-lg border border-ink-900/10 bg-surface px-2 text-[13px] text-ink-700 hover:border-ink-900/20 focus:border-accent focus:outline-none transition-colors max-w-[180px]"
-                          placeholder="Model (optional)"
-                          value={formModel}
-                          onChange={(e) => setFormModel(e.target.value)}
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        className="h-8 min-w-0 flex-1 max-w-[180px] rounded-lg border border-ink-900/10 bg-surface px-2.5 text-[13px] text-ink-700 hover:border-ink-900/20 focus:border-accent focus:outline-none transition-colors"
+                        placeholder="Model (optional)"
+                        value={formModel}
+                        onChange={(e) => setFormModel(e.target.value)}
+                      />
+
+                      {/* Attachment (placeholder) */}
+                      <button
+                        type="button"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink-900/10 text-muted hover:border-ink-900/20 hover:bg-surface-tertiary hover:text-ink-700 transition-colors"
+                        title="Attach files (coming soon)"
+                        aria-label="Attach files"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </button>
                     </div>
 
                     {/* Send button */}
@@ -339,18 +365,18 @@ function App() {
                           <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="white" />
                         </svg>
                       ) : (
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4l2.8 7.2L16 12l-9.8 1.4-2.8 7.2Z" fill="currentColor" /></svg>
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
                       )}
                     </button>
                   </div>
                 </div>
 
-                {/* Directory selector — below the input; optional. No directory → conversation task. */}
-                <div ref={dirPickerRef} className="relative mt-2.5 flex items-center gap-2">
+                {/* Directory selector — below the card; optional. No directory → conversation task. */}
+                <div ref={dirPickerRef} className="relative mt-2 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setShowDirPicker(!showDirPicker)}
-                    className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[13px] transition-colors ${
+                    className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[13px] transition-colors ${
                       formCwd
                         ? "border-accent/30 bg-accent/5 text-ink-700 hover:border-accent/50"
                         : "border-ink-900/10 bg-surface text-muted hover:border-ink-900/20 hover:text-ink-700"
@@ -370,7 +396,7 @@ function App() {
                     <button
                       type="button"
                       onClick={() => setFormCwd("")}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-tertiary hover:text-ink-700 transition-colors"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-tertiary hover:text-ink-700 transition-colors"
                       title="Clear directory (switch to conversation task)"
                       aria-label="Clear directory"
                     >
