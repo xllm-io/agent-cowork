@@ -69,7 +69,7 @@ const getDefaultIcon = () => (
 // HoverActionBar — copy + fork buttons on hover
 // ---------------------------------------------------------------------------
 
-const HoverActionBar: React.FC<{ showCopy?: boolean; onFork?: () => void }> = ({ showCopy = true, onFork }) => {
+const HoverActionBar: React.FC<{ copyText?: string; onFork?: () => void }> = ({ copyText, onFork }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async (text: string) => {
@@ -78,8 +78,8 @@ const HoverActionBar: React.FC<{ showCopy?: boolean; onFork?: () => void }> = ({
 
   return (
     <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-      {showCopy && (
-        <button onClick={() => handleCopy("placeholder")} className="text-[11px] text-muted hover:text-ink-600 px-1.5 py-0.5 rounded hover:bg-surface-tertiary transition-colors" title="Copy all text">
+      {copyText && (
+        <button onClick={() => handleCopy(copyText)} className="text-[11px] text-muted hover:text-ink-600 px-1.5 py-0.5 rounded hover:bg-surface-tertiary transition-colors" title="Copy all text">
           {copied ? "✓ Copied" : "Copy"}
         </button>
       )}
@@ -295,7 +295,7 @@ export function AssistantProse({
       {isStreaming && <TypingIndicator />}
 
       {/* Hover action bar */}
-      {fullText && <HoverActionBar onFork={onFork} />}
+      {fullText && <HoverActionBar copyText={fullText} onFork={onFork} />}
     </div>
   );
 }
