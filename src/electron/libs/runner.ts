@@ -12,6 +12,7 @@ import { join } from "path";
 export type RunnerOptions = {
   prompt: string;
   session: Session;
+  model?: string;
   resumeSessionId?: string;
   onEvent: (event: ServerEvent) => void;
   onSessionUpdate?: (updates: Partial<Session>) => void;
@@ -25,7 +26,7 @@ const DEFAULT_CWD = process.cwd();
 
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
-  const { prompt, session, resumeSessionId, onEvent, onSessionUpdate } = options;
+  const { prompt, session, model, resumeSessionId, onEvent, onSessionUpdate } = options;
   const abortController = new AbortController();
 
   const sendMessage = (message: SDKMessage) => {
@@ -62,6 +63,12 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
         ...getEnhancedEnv(),
         ...env
       };
+
+      // Per-session model overrides the global default (delivered via env).
+      const effectiveModel = (model && model.trim()) || config.model;
+      if (effectiveModel) {
+        mergedEnv.ANTHROPIC_MODEL = effectiveModel;
+      }
 
       // Conversation sessions have no cwd — give the agent a temporary sandbox dir.
       let effectiveCwd = session.cwd;

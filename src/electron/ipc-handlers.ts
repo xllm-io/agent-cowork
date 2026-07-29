@@ -95,7 +95,8 @@ export function handleClientEvent(event: ClientEvent) {
       cwd: event.payload.cwd,
       title: event.payload.title,
       allowedTools: event.payload.allowedTools,
-      prompt: event.payload.prompt
+      prompt: event.payload.prompt,
+      model: event.payload.model
     });
 
     sessions.updateSession(session.id, {
@@ -175,6 +176,7 @@ export function handleClientEvent(event: ClientEvent) {
     runClaude({
       prompt: event.payload.prompt,
       session,
+      model: session.model,
       resumeSessionId: session.claudeSessionId,
       onEvent: emit,
       onSessionUpdate: (updates) => {

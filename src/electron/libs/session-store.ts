@@ -14,6 +14,7 @@ export type Session = {
   claudeSessionId?: string;
   status: SessionStatus;
   cwd?: string;
+  model?: string;
   allowedTools?: string;
   lastPrompt?: string;
   pendingPermissions: Map<string, PendingPermission>;
@@ -25,6 +26,7 @@ export type StoredSession = {
   title: string;
   status: SessionStatus;
   cwd?: string;
+  model?: string;
   allowedTools?: string;
   lastPrompt?: string;
   claudeSessionId?: string;
@@ -47,7 +49,7 @@ export class SessionStore {
     this.loadSessions();
   }
 
-  createSession(options: { cwd?: string; allowedTools?: string; prompt?: string; title: string }): Session {
+  createSession(options: { cwd?: string; allowedTools?: string; prompt?: string; title: string; model?: string }): Session {
     const id = crypto.randomUUID();
     const now = Date.now();
     const session: Session = {
@@ -55,6 +57,7 @@ export class SessionStore {
       title: options.title,
       status: "idle",
       cwd: options.cwd,
+      model: options.model,
       allowedTools: options.allowedTools,
       lastPrompt: options.prompt,
       pendingPermissions: new Map()
@@ -63,8 +66,8 @@ export class SessionStore {
     this.db
       .prepare(
         `insert into sessions
-          (id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (id, title, claude_session_id, status, cwd, model, allowed_tools, last_prompt, created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -72,6 +75,7 @@ export class SessionStore {
         session.claudeSessionId ?? null,
         session.status,
         session.cwd ?? null,
+        session.model ?? null,
         session.allowedTools ?? null,
         session.lastPrompt ?? null,
         now,
@@ -87,7 +91,7 @@ export class SessionStore {
   listSessions(): StoredSession[] {
     const rows = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, created_at, updated_at
+        `select id, title, claude_session_id, status, cwd, model, allowed_tools, last_prompt, created_at, updated_at
          from sessions
          order by updated_at desc`
       )
@@ -97,6 +101,7 @@ export class SessionStore {
       title: String(row.title),
       status: row.status as SessionStatus,
       cwd: row.cwd ? String(row.cwd) : undefined,
+      model: row.model ? String(row.model) : undefined,
       allowedTools: row.allowed_tools ? String(row.allowed_tools) : undefined,
       lastPrompt: row.last_prompt ? String(row.last_prompt) : undefined,
       claudeSessionId: row.claude_session_id ? String(row.claude_session_id) : undefined,
@@ -122,7 +127,7 @@ export class SessionStore {
   getSessionHistory(id: string): SessionHistory | null {
     const sessionRow = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt, created_at, updated_at
+        `select id, title, claude_session_id, status, cwd, model, allowed_tools, last_prompt, created_at, updated_at
          from sessions
          where id = ?`
       )
@@ -142,6 +147,7 @@ export class SessionStore {
         title: String(sessionRow.title),
         status: sessionRow.status as SessionStatus,
         cwd: sessionRow.cwd ? String(sessionRow.cwd) : undefined,
+        model: sessionRow.model ? String(sessionRow.model) : undefined,
         allowedTools: sessionRow.allowed_tools ? String(sessionRow.allowed_tools) : undefined,
         lastPrompt: sessionRow.last_prompt ? String(sessionRow.last_prompt) : undefined,
         claudeSessionId: sessionRow.claude_session_id ? String(sessionRow.claude_session_id) : undefined,
@@ -193,6 +199,7 @@ export class SessionStore {
       claudeSessionId: "claude_session_id",
       status: "status",
       cwd: "cwd",
+      model: "model",
       allowedTools: "allowed_tools",
       lastPrompt: "last_prompt"
     } as const;
@@ -223,12 +230,19 @@ export class SessionStore {
         claude_session_id text,
         status text not null,
         cwd text,
+        model text,
         allowed_tools text,
         last_prompt text,
         created_at integer not null,
         updated_at integer not null
       )`
     );
+    // Migrate older DBs that predate the model column.
+    try {
+      this.db.exec(`alter table sessions add column model text`);
+    } catch {
+      // Column already exists — ignore.
+    }
     this.db.exec(
       `create table if not exists messages (
         id text primary key,
@@ -244,7 +258,7 @@ export class SessionStore {
   private loadSessions(): void {
     const rows = this.db
       .prepare(
-        `select id, title, claude_session_id, status, cwd, allowed_tools, last_prompt
+        `select id, title, claude_session_id, status, cwd, model, allowed_tools, last_prompt
          from sessions`
       )
       .all();
@@ -255,6 +269,7 @@ export class SessionStore {
         claudeSessionId: row.claude_session_id ? String(row.claude_session_id) : undefined,
         status: row.status as SessionStatus,
         cwd: row.cwd ? String(row.cwd) : undefined,
+        model: row.model ? String(row.model) : undefined,
         allowedTools: row.allowed_tools ? String(row.allowed_tools) : undefined,
         lastPrompt: row.last_prompt ? String(row.last_prompt) : undefined,
         pendingPermissions: new Map()

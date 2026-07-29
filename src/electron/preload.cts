@@ -35,6 +35,8 @@ electron.contextBridge.exposeInMainWorld("electron", {
         ipcInvoke("save-api-config", config),
     checkApiConfig: () =>
         ipcInvoke("check-api-config"),
+    getAvailableModels: () =>
+        ipcInvoke("get-available-models"),
     createTempDirectory: () =>
         ipcInvoke("create-temp-directory"),
     listDirectories: (parentPath?: string) =>

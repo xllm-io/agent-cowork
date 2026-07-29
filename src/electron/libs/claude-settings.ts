@@ -75,3 +75,36 @@ export function buildEnvForConfig(config: ApiConfig): Record<string, string> {
 
   return baseEnv;
 }
+
+// 读取 ~/.claude/settings.json 顶层约定的 models 数组（不存在或非法则返回 []）
+export function readClaudeSettingsModels(): string[] {
+  try {
+    const settingsPath = join(homedir(), ".claude", "settings.json");
+    const raw = readFileSync(settingsPath, "utf8");
+    const parsed = JSON.parse(raw) as { models?: unknown };
+    if (!Array.isArray(parsed.models)) return [];
+    return parsed.models.filter((m): m is string => typeof m === "string" && m.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+// 合并可选模型列表：自定义(api-config) + settings.json + 当前默认 model，去重去空，保持顺序
+export function getAvailableModels(): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  const push = (m: unknown) => {
+    if (typeof m !== "string") return;
+    const trimmed = m.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    result.push(trimmed);
+  };
+
+  const uiConfig = loadApiConfig();
+  uiConfig?.models?.forEach(push);
+  readClaudeSettingsModels().forEach(push);
+  push(getCurrentApiConfig()?.model);
+
+  return result;
+}

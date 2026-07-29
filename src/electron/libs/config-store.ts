@@ -8,7 +8,8 @@ export type ApiConfig = {
   apiKey: string;
   baseURL: string;
   model: string;
-  apiType?: ApiType; // "anthropic" 
+  models?: string[]; // user-maintained list of selectable models
+  apiType?: ApiType; // "anthropic"
 };
 
 const CONFIG_FILE_NAME = "api-config.json";
@@ -60,7 +61,20 @@ export function saveApiConfig(config: ApiConfig): void {
     if (!config.apiType) {
       config.apiType = "anthropic";
     }
-    
+
+    // 规整 models 列表：去空、去重、仅保留字符串 normalize models list
+    if (config.models !== undefined) {
+      if (Array.isArray(config.models)) {
+        const seen = new Set<string>();
+        config.models = config.models
+          .filter((m): m is string => typeof m === "string")
+          .map((m) => m.trim())
+          .filter((m) => m.length > 0 && !seen.has(m) && (seen.add(m), true));
+      } else {
+        delete config.models;
+      }
+    }
+
     // 保存配置 save config
     writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");
     console.info("[config-store] API config saved successfully");

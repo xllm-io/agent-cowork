@@ -6,7 +6,7 @@ import { getStaticData, pollResources, stopPolling } from "./test.js";
 import { handleClientEvent, sessions, cleanupAllSessions } from "./ipc-handlers.js";
 import { generateSessionTitle } from "./libs/util.js";
 import { saveApiConfig } from "./libs/config-store.js";
-import { getCurrentApiConfig } from "./libs/claude-settings.js";
+import { getCurrentApiConfig, getAvailableModels } from "./libs/claude-settings.js";
 import type { ClientEvent } from "./types.js";
 import { mkdtemp } from "fs/promises";
 import { tmpdir } from "os";
@@ -126,6 +126,11 @@ app.on("ready", () => {
     ipcMainHandle("check-api-config", () => {
         const config = getCurrentApiConfig();
         return { hasConfig: config !== null, config };
+    });
+
+    // Handle available models (merged: custom list + ~/.claude/settings.json + default)
+    ipcMainHandle("get-available-models", () => {
+        return { models: getAvailableModels() };
     });
 
     ipcMainHandle("save-api-config", (_: any, config: any) => {

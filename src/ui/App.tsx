@@ -8,6 +8,7 @@ import { Sidebar } from "./components/Sidebar";
 import { SettingsModal } from "./components/SettingsModal";
 import { HomeScreen } from "./components/HomeScreen";
 import { DirectoryPickerPopover } from "./components/DirectoryPickerPopover";
+import { ModelSelect } from "./components/ModelSelect";
 import { PromptInput } from "./components/PromptInput";
 import { TurnBlock } from "./components/TurnBlock";
 
@@ -263,12 +264,14 @@ function App() {
         // No directory → conversation task (backend leaves cwd empty).
         cwd: formCwd.trim() || undefined,
         allowedTools: "Read,Edit,Bash",
+        // Empty model → backend uses the configured default.
+        model: formModel.trim() || undefined,
       }
     });
 
     // Clear form state
     setFormPrompt("");
-  }, [formCwd, formPrompt, sendEvent, setGlobalError]);
+  }, [formCwd, formModel, formPrompt, sendEvent, setGlobalError]);
 
   // Quick templates for the home screen
   const QUICK_TEMPLATES = [
@@ -327,13 +330,7 @@ function App() {
                   <div className="relative flex items-center justify-between gap-3 px-3 pb-2.5 pt-1">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       {/* Model selector */}
-                      <input
-                        type="text"
-                        className="h-8 min-w-0 flex-1 max-w-[180px] rounded-lg border border-ink-900/10 bg-surface px-2.5 text-[13px] text-ink-700 hover:border-ink-900/20 focus:border-accent focus:outline-none transition-colors"
-                        placeholder="Model (optional)"
-                        value={formModel}
-                        onChange={(e) => setFormModel(e.target.value)}
-                      />
+                      <ModelSelect value={formModel} onChange={setFormModel} />
 
                       {/* Attachment (placeholder) */}
                       <button

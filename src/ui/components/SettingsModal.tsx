@@ -18,6 +18,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const [apiKey, setApiKey] = useState("");
   const [baseURL, setBaseURL] = useState("");
   const [model, setModel] = useState("");
+  const [models, setModels] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           setApiKey(config.apiKey);
           setBaseURL(config.baseURL);
           setModel(config.model);
+          setModels((config.models ?? []).join("\n"));
         }
       })
       .catch((err) => {
@@ -58,10 +60,20 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     setSaving(true);
 
     try {
+      const parsedModels = Array.from(
+        new Set(
+          models
+            .split("\n")
+            .map((m) => m.trim())
+            .filter((m) => m.length > 0)
+        )
+      );
+
       const result = await window.electron.saveApiConfig({
         apiKey: apiKey.trim(),
         baseURL: baseURL.trim(),
         model: model.trim(),
+        models: parsedModels,
         apiType: "anthropic"
       });
 
@@ -168,6 +180,20 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                       onChange={(e) => setModel(e.target.value)}
                       required
                     />
+                  </label>
+
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium text-muted">Available Models</span>
+                    <textarea
+                      rows={4}
+                      className="resize-y rounded-xl border border-ink-900/10 bg-surface-secondary px-4 py-2.5 text-sm text-ink-800 placeholder:text-muted-light focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/20 transition-colors font-mono"
+                      placeholder={"One model per line, e.g.\nclaude-sonnet-4-5\nclaude-opus-4-1"}
+                      value={models}
+                      onChange={(e) => setModels(e.target.value)}
+                    />
+                    <span className="text-[11px] text-muted-light">
+                      每行一个模型，将与 ~/.claude/settings.json 中的 models 合并，供输入框选择。
+                    </span>
                   </label>
                 </>
               )}
